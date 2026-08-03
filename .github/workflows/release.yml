@@ -1,0 +1,55 @@
+name: Release to NuGet
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Derive version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Restore
+        run: dotnet restore B44.Standards.sln
+
+      - name: Verify synchronized guidance
+        run: dotnet build B44.Standards/B44.Standards.csproj --configuration Release --no-restore -p:B44AgentSyncVerifyOnly=true -p:Version=$VERSION
+
+      - name: Build
+        run: dotnet build B44.Standards.sln --configuration Release --no-restore -p:Version=$VERSION
+
+      - name: Test
+        run: dotnet test B44.Standards.sln --configuration Release --no-build --verbosity minimal
+
+      - name: Pack
+        run: dotnet pack B44.Standards.sln --configuration Release --no-build -p:Version=$VERSION --output ./nupkgs
+
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push packages to nuget.org
+        run: |
+          for pkg in nupkgs/*.nupkg; do
+            dotnet nuget push "$pkg" \
+              --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done

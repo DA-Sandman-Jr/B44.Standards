@@ -1,0 +1,3 @@
+<Project>
+  <Import Project="$(MSBuildThisFileDirectory)B44.Standards/buildTransitive/B44.Standards.targets" />
+</Project>

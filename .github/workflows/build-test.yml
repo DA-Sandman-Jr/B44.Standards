@@ -1,0 +1,29 @@
+name: build-test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore B44.Standards.sln
+
+      - name: Verify synchronized guidance
+        run: dotnet build B44.Standards/B44.Standards.csproj -c Debug --no-restore -p:B44AgentSyncVerifyOnly=true
+
+      - name: Build solution
+        run: dotnet build B44.Standards.sln -c Debug --no-restore
+
+      - name: Run tests
+        run: dotnet test B44.Standards.sln -c Debug --no-build

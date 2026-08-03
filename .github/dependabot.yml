@@ -1,0 +1,32 @@
+# Dependency updates are review signals, not automatic upgrades. Analyzer
+# changes stay grouped separately because they can expand build enforcement.
+
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    groups:
+      # One PR per ecosystem rather than per package: these move together and
+      # separate PRs would multiply review for no added signal.
+      analyzers:
+        patterns:
+          - "Meziantou.Analyzer"
+          - "Microsoft.CodeAnalysis.*"
+      testing:
+        patterns:
+          - "xunit*"
+          - "Microsoft.NET.Test.Sdk"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "ci"
