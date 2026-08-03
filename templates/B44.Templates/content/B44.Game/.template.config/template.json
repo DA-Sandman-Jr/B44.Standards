@@ -27,7 +27,7 @@
     "commonVersion": {
       "type": "parameter",
       "datatype": "string",
-      "defaultValue": "0.10.*",
+      "defaultValue": "0.11.*",
       "replaces": "B44_COMMON_VERSION",
       "description": "Compatibility-bounded float for B44.Common."
     },
