@@ -21,7 +21,7 @@ Parameters (`dotnet new b44game --help` lists them):
 | `--standardsVersion` | `0.10.*` | Compatibility-bounded float for `B44.Standards` |
 | `--commonVersion` | `0.10.*` | Compatibility-bounded float for `B44.Common` |
 | `--targetFramework` | `net8.0` | Core and test target framework |
-| `--ciRef` | `main` | Ref for the shared reusable CI workflow — pin to a reviewed SHA |
+| `--ciRef` | `9c6faefab05253a4fa1d16b971d37cc8c80bf750` | Reviewed commit for the shared reusable CI workflow |
 
 **Why a separate `B44.Templates` package rather than shipping inside
 `B44.Standards`:** the consumption models differ completely. `B44.Standards` is

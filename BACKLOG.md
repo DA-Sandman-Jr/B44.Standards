@@ -17,7 +17,7 @@ tag.
 
 ### 2. Move reusable CI consumers
 
-**Status:** Planned after the initial commit is public.
+**Status:** In progress. The generated template is pinned; consumer repositories remain.
 
 Pin TicTacHoe, Time Machine Clicker, Whispers, and B44.Godot to an immutable
 commit of `.github/workflows/reusable-dotnet-ci.yml` in this repository. Update

@@ -41,7 +41,7 @@
     "ciRef": {
       "type": "parameter",
       "datatype": "string",
-      "defaultValue": "main",
+      "defaultValue": "9c6faefab05253a4fa1d16b971d37cc8c80bf750",
       "replaces": "B44_CI_REF",
       "description": "Git ref for the shared reusable CI workflow. Pin to a reviewed SHA rather than a branch for anything you care about."
     }
