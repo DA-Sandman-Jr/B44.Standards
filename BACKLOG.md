@@ -44,9 +44,30 @@ Candidates for the managed **organization** section:
    a scenario. Already the practice in `B44.Common` and `B44.Godot`; currently
    undocumented.
 
+Also candidates, and not repository-specific — these are working conventions
+earned from real failures rather than style preferences:
+
+9. **Prefer a targeted edit over scripted string replacement for
+   context-sensitive changes.** A regex or `.Replace` that matches nothing
+   fails *silently* and reports success. This produced five wrong-but-green
+   states in one initiative, two of them in documentation where neither the
+   compiler nor the tests could catch it. Scripted replacement is fine for
+   mechanical repo-wide renames where a follow-up grep proves the result.
+10. **When a type loses public members, find the assertions that died with
+    them.** Removing a member deletes every test that referenced it, and the
+    compiler reports the member, never the lost coverage — build green, suite
+    green, requirement quietly unproven. Leftover fixture arguments are worse
+    than nothing, because they still read as intent.
+11. **Doc comments are load-bearing and unverified.** After a behavioural
+    change, sweep the absence-claims near it — "never", "no", "nothing",
+    "not invoked". A comment asserting the opposite of the code reads as
+    authoritative and is worse than no comment. XML `cref`s are compiler-checked
+    under `TreatWarningsAsErrors`; prose is not.
+
 **Not** a candidate: the acceptance-gate trait and manifest scheme in
 `B44.GameSystems`. That exists to report against a gated delivery plan and
-would be noise in a repository without one.
+would be noise in a repository without one. The closing-read rule that governs
+it is likewise initiative-specific.
 
 Open questions for whoever picks this up:
 
