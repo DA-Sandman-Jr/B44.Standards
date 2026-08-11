@@ -32,6 +32,8 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    env:
+      NuGetPackageSourceCredentials_github: "Username=${{ github.actor }};Password=${{ secrets.GITHUB_TOKEN }};ValidAuthenticationTypes=Basic"
     steps:
       - uses: actions/checkout@v7
 
