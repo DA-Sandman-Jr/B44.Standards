@@ -45,24 +45,23 @@ Candidates for the managed **organization** section:
    undocumented.
 
 Also candidates, and not repository-specific — these are working conventions
-earned from real failures rather than style preferences:
+intended to make routine changes easier to verify:
 
 9. **Prefer a targeted edit over scripted string replacement for
    context-sensitive changes.** A regex or `.Replace` that matches nothing
-   fails *silently* and reports success. This produced five wrong-but-green
-   states in one initiative, two of them in documentation where neither the
-   compiler nor the tests could catch it. Scripted replacement is fine for
-   mechanical repo-wide renames where a follow-up grep proves the result.
+   can leave the intended text unchanged without making that obvious. Scripted
+   replacement is fine for mechanical repo-wide renames where a follow-up grep
+   proves the result.
 10. **When a type loses public members, find the assertions that died with
-    them.** Removing a member deletes every test that referenced it, and the
-    compiler reports the member, never the lost coverage — build green, suite
-    green, requirement quietly unproven. Leftover fixture arguments are worse
-    than nothing, because they still read as intent.
+    them.** Removing a member can also remove the tests that expressed its
+    contract without identifying which behavioral assertion needs a new home.
+    Leftover fixture arguments should be removed because they can still read
+    as intent.
 11. **Doc comments are load-bearing and unverified.** After a behavioural
     change, sweep the absence-claims near it — "never", "no", "nothing",
-    "not invoked". A comment asserting the opposite of the code reads as
-    authoritative and is worse than no comment. XML `cref`s are compiler-checked
-    under `TreatWarningsAsErrors`; prose is not.
+    "not invoked". XML `cref`s are compiler-checked under
+    `TreatWarningsAsErrors`; prose still requires review for alignment with
+    the implementation.
 
 **Not** a candidate: the acceptance-gate trait and manifest scheme in
 `B44.GameSystems`. That exists to report against a gated delivery plan and
@@ -81,6 +80,135 @@ Open questions for whoever picks this up:
 - Existing repositories predate several of these. Decide whether adoption is
   retroactive or applies to new code only; a flag day across four repositories
   is probably not worth it.
+
+### S2. Evaluate and confirm proposed mechanical guardrails
+
+**Status:** **Planned for evaluation** since 2026-08-13. The only decision
+recorded here is to investigate these candidates. None is approved for
+implementation, sequencing, or organization-wide enforcement yet.
+
+`B44.GameSystems` produced a mechanical-guardrails review covering dependency
+boundaries, deterministic authority, public contracts, conformance, and
+package distribution. Before any proposal becomes planned implementation,
+confirm the underlying authority is stable, collect objective supporting
+evidence, identify the correct owning repository, and measure the proposed
+enforcement against every active consumer as required for an
+enforcement-expanding Standards change.
+
+Evaluate the following candidates first because the review considers them
+small, objectively decidable, and potentially high-value. That assessment is
+a hypothesis to verify, not an accepted priority order:
+
+1. **Production dependency allowlists.** Confirm the intended production
+   project/package graph, whether evaluated `ProjectReference` and runtime
+   `PackageReference` items provide complete evidence, how test projects and
+   approved exceptions are distinguished, and whether the policy belongs in
+   Standards or in a GameSystems-owned boundary test.
+2. **Explicit public API manifests.** Evaluate
+   `Microsoft.CodeAnalysis.PublicApiAnalyzers` and
+   `PublicAPI.Shipped.txt` / `PublicAPI.Unshipped.txt` for genuinely reusable
+   packages. Confirm how this overlaps with package compatibility policy and
+   whether rapidly changing or unreleased packages should participate.
+3. **Ambient determinism restrictions.** Baseline and classify uses of
+   `Guid.NewGuid`, tick counts, `Stopwatch`, entropy sources, and other
+   process- or machine-derived inputs. Confirm which code is authoritative,
+   which exact APIs are unsafe there, and how caller-supplied deterministic
+   providers remain valid without banning ordinary equality hashing.
+4. **Deterministic string and culture semantics.** Measure narrow built-in
+   globalization rules such as `CA1309` and `CA1310`, then determine whether
+   additional parsing/formatting rules can distinguish machine-readable
+   authority from localized presentation with acceptably low noise.
+5. **Environmental-effect and serialization fences.** Confirm the reusable
+   authority boundary before prohibiting exact filesystem, networking,
+   process, environment-state, or concrete serialization APIs. Preserve
+   neutral snapshot/restoration contracts and consumer-owned adapters.
+6. **Public API technology-leakage scans.** Prototype a recursive public-
+   surface check covering parameters, return types, members, arrays, by-ref
+   forms, and nested generics. Validate the initial forbidden technology
+   families and whether an existing analyzer can replace a custom reflection
+   test.
+
+Evaluate these second-wave candidates only after the first group has been
+measured in real work and has demonstrated enough value to justify more
+machinery:
+
+7. **Opt-in exhaustive conformance for designated finite outcomes.** Confirm
+   that specific closed outcome enums benefit from member-by-member semantic
+   cases and that a helper can require them without treating every enum as a
+   conformance contract.
+8. **Deterministic replay and fresh-process conformance.** Select a few
+   high-value scenarios and determine whether independent runs, cultures, or
+   fresh processes expose defects that banned-symbol rules cannot. Test code,
+   rather than production objects, should own any canonical projection.
+9. **Writable static authority-state rejection.** Inventory production
+   statics, define what constitutes authority state, and confirm that an exact
+   exception list can stay small and trustworthy.
+10. **Foundation scheduler-escape restrictions.** Gather implementation
+    evidence before considering a narrow analyzer for `Task.Run`,
+    `Task.Delay`, `TaskFactory.StartNew`, threads, thread-pool work, timers, or
+    `Parallel.*` inside the deterministic scheduling boundary. Do not infer a
+    general organization-wide concurrency doctrine from this candidate.
+
+Evaluate the following only when the named product boundary actually exists:
+
+11. **Minimal-consumer package smoke tests.** When packages claim independent
+    consumption, assess pack-to-local-feed tests that restore, build, and run
+    a minimal documented composition using only declared dependencies.
+12. **Released-package compatibility validation.** When packages have a
+    meaningful compatibility baseline, evaluate official .NET Package
+    Validation / ApiCompat and the required suppression and versioning policy.
+13. **Namespace-to-folder enforcement.** After S1 decides the convention and
+    adoption policy, identify the built-in SDK rule, clean baseline, and
+    consumer impact before enabling it.
+14. **Public-type-to-file enforcement.** After S1 confirms the convention,
+    evaluate existing analyzer support, companion-type exceptions, and the
+    migration cost across consumers.
+15. **Durable save-compatibility fixtures.** Revisit only in a consumer that
+    has shipped a durable save contract. Historical fixtures, malformed and
+    future-version behavior, and failure atomicity belong with that
+    consumer's real serializer rather than in GameSystems or Standards.
+
+Also confirm the review's recommendation to leave the following out of the
+mechanical roadmap unless substantially new evidence changes the tradeoff:
+
+- ArchUnitNET as standard infrastructure, paid architecture/compliance or
+  agent-observability tooling, and permanent multi-agent evaluator harnesses.
+- Mandatory repository-wide mutation testing, generic line/branch coverage
+  thresholds, public-member-to-test-reference counts, and generic story/test
+  traceability infrastructure.
+- Per-story changed-file allowlists, broad type-name or collection/namespace
+  blacklists, Clean Architecture/DDD/design-pattern analyzers, and a custom
+  architecture DSL.
+- A generic persistence/serialization framework inside GameSystems or a large
+  documentation-verification system without a demonstrated failure it would
+  prevent.
+
+For each candidate, record an explicit outcome: adopt, narrow, defer until a
+named trigger, retain as semantic review, or reject. Adoption requires all of
+the following to be confirmed:
+
+- the B44 authority or compatibility boundary is stable and has an identified
+  owner;
+- the violation is objectively decidable from complete evidence and has a
+  meaningful cost or blast radius;
+- false positives and exception pressure are low enough to preserve trust;
+- the check does not prescribe an unnecessary implementation and can run
+  locally without paid infrastructure;
+- analyzer/versioning implications and active-consumer baselines are known;
+- acceptance cases include passing examples, failing examples, and the
+  intended escape or extension mechanism.
+
+Because this backlog is public, publish evaluation outcomes at the policy and
+product-contract level. Do not include references to unrelated games or
+clients, credentials or secrets, private service details, or actionable
+security findings. Describe a proposed guardrail as preventive policy rather
+than evidence of a current weakness. If evaluation uncovers a secret or an
+exploitable issue, keep the details out of this backlog and route them through
+the appropriate private remediation and disclosure process.
+
+Stop adding mechanical rules when the remaining question is whether a concept
+belongs in B44, which system owns it, whether it has earned generalization, or
+whether a design abstraction is justified. Those remain semantic decisions.
 
 ## Known Defects
 
