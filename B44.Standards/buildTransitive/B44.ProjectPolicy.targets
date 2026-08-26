@@ -37,7 +37,31 @@
        Only applied when the consumer has not chosen its own runsettings. -->
   <PropertyGroup Condition="'$(IsTestProject)' == 'true' and '$(RunSettingsFilePath)' == '' and '$(B44TestRunSettings)' != 'false'">
     <RunSettingsFilePath>$(MSBuildThisFileDirectory)../config/B44.Tests.runsettings</RunSettingsFilePath>
+    <_B44SuppliedRunSettings>true</_B44SuppliedRunSettings>
   </PropertyGroup>
+
+  <!-- A project that brings its own runsettings — usually to pin a platform or
+       configure a collector — replaces the shipped default and loses the floor
+       with it, silently. Say so rather than letting the guarantee evaporate.
+
+       A warning, not an error: supplying runsettings is an ordinary
+       configuration choice, not an act of suppression, and every always-on
+       check in this package is green across every current consumer by design.
+       The fix is one line in their own file. Note this cannot see the
+       `dotnet test` settings option, which bypasses MSBuild entirely. -->
+  <Target Name="B44VerifyTestRunSettings"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(IsTestProject)' == 'true' and '$(_B44SuppliedRunSettings)' != 'true' and '$(RunSettingsFilePath)' != '' and Exists('$(RunSettingsFilePath)') and '$(B44TestRunSettings)' != 'false'">
+    <ReadLinesFromFile File="$(RunSettingsFilePath)">
+      <Output TaskParameter="Lines" ItemName="_B44RunSettingsLine" />
+    </ReadLinesFromFile>
+    <PropertyGroup>
+      <_B44RunSettingsText>@(_B44RunSettingsLine, '')</_B44RunSettingsText>
+    </PropertyGroup>
+    <Warning Condition="!$(_B44RunSettingsText.Contains('TreatNoTestsAsError'))"
+             Code="B44T003"
+             Text="$(MSBuildProjectName) supplies its own runsettings ($(RunSettingsFilePath)), which replaces the B44 default, so a run that discovers zero tests will report SUCCESS again. Add &lt;TreatNoTestsAsError&gt;true&lt;/TreatNoTestsAsError&gt; to that file's RunConfiguration." />
+  </Target>
 
   <!-- ── Reference policy ─────────────────────────────────────────────────
        Two objectively decidable rules over items MSBuild already evaluated. -->

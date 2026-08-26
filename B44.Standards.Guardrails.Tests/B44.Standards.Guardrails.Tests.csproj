@@ -25,7 +25,7 @@
          further to messages: a green build must not carry warnings that are
          actually passing negative tests. -->
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44E001;B44H002;B44S001;B44S002</MSBuildWarningsAsMessages>
-    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44T001;B44T002;B44P002;B44P003;B44W001;B44W006</MSBuildWarningsAsMessages>
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44T001;B44T002;B44P002;B44P003;B44W001;B44W006;B44E004;B44E005;B44T003</MSBuildWarningsAsMessages>
   </PropertyGroup>
 
   <!-- ── Target-based guards ─────────────────────────────────────────────────
@@ -77,12 +77,38 @@
         <VerifyTarget>B44VerifyWarningPolicy</VerifyTarget>
         <Why>this repository's own conforming warning settings</Why>
       </_Probe>
+      <_Probe Include="MissingList">
+        <VerifyTarget>B44VerifyBannedSymbolLists</VerifyTarget>
+        <Why>a repository-owned banned-symbol list whose path does not exist</Why>
+      </_Probe>
+      <_Probe Include="MisnamedList">
+        <VerifyTarget>B44VerifyBannedSymbolLists</VerifyTarget>
+        <Why>a real list the analyzer will never read, because of its name</Why>
+      </_Probe>
+      <_Probe Include="ValidList">
+        <VerifyTarget>B44VerifyBannedSymbolLists</VerifyTarget>
+        <Why>a correctly named, existing repository-owned list</Why>
+      </_Probe>
+      <!-- B44T003 is a warning by design, so these two promote it to an error
+           on the probe command line. That is how the fixture reads a warning's
+           verdict through an exit code without making the shipped check
+           stricter than it is. -->
+      <_Probe Include="OwnRunSettings">
+        <VerifyTarget>B44VerifyTestRunSettings</VerifyTarget>
+        <Args>-warnaserror:B44T003</Args>
+        <Why>a consumer runsettings that drops the zero-tests floor</Why>
+      </_Probe>
+      <_Probe Include="GoodRunSettings">
+        <VerifyTarget>B44VerifyTestRunSettings</VerifyTarget>
+        <Args>-warnaserror:B44T003</Args>
+        <Why>a consumer runsettings that keeps the floor</Why>
+      </_Probe>
     </ItemGroup>
 
     <!-- Batched over @(_Probe): one Exec per probe. Forward slashes because an
          Exec command line is a raw shell string that MSBuild does not
          normalize, and CI runs on Linux, where a backslash is not a separator. -->
-    <Exec Command="dotnet msbuild &quot;$(MSBuildProjectDirectory)/probes/%(_Probe.Identity)/%(_Probe.Identity).csproj&quot; -t:%(_Probe.VerifyTarget) -nologo -v:q -nodeReuse:false"
+    <Exec Command="dotnet msbuild &quot;$(MSBuildProjectDirectory)/probes/%(_Probe.Identity)/%(_Probe.Identity).csproj&quot; -t:%(_Probe.VerifyTarget) %(_Probe.Args) -nologo -v:q -nodeReuse:false"
           IgnoreExitCode="true"
           StandardOutputImportance="low"
           StandardErrorImportance="low"
@@ -93,7 +119,7 @@
     <!-- Exec batching yields one _ProbeResult per probe, in item order. -->
     <PropertyGroup>
       <_ProbeResults>@(_ProbeResult, ',')</_ProbeResults>
-      <_ExpectedResults>1,1,0,1,1,1,1,0</_ExpectedResults>
+      <_ExpectedResults>1,1,0,1,1,1,1,0,1,1,0,1,0</_ExpectedResults>
     </PropertyGroup>
     <Error Condition="'$(_ProbeResults)' != '$(_ExpectedResults)'"
            Text="Project-policy probe outcomes were '$(_ProbeResults)', expected '$(_ExpectedResults)' (0 = target passed, 1 = target failed) for: @(_Probe->'%(Identity) [%(Why)]', '; '). A guard either stopped firing on a violation or started rejecting a conforming project." />
@@ -147,14 +173,56 @@
     <Error Condition="'$(_AnalyzerViolations)' != '1'"
            Text="An engine source generator supplied as an analyzer was not detected; got '$(_AnalyzerViolations)' violation(s)." />
 
-    <!-- The escape hatch, for the non-engine package that collides with the
-         Unity prefix (the Unity IoC container is the real-world case). -->
+    <!-- The Unity IoC container is an unrelated .NET DI library whose package
+         names collide with the engine's module prefix. It is exempt by default
+         so the broad "Unity.*" match can stay broad: matching narrowly would
+         fail open the day Unity ships another engine module. -->
     <ItemGroup>
-      <_CollidingReference Include="C:\refs\Unity.Container.dll" />
-      <_CollidingAllow Include="Unity.Container" />
+      <_UnityIocReference Include="C:\refs\Unity.Container.dll" />
+      <_UnityIocReference Include="C:\refs\Unity.Abstractions.dll" />
+      <_UnityIocReference Include="C:\refs\Unity.Interception.dll" />
+      <_UnityIocReference Include="C:\refs\Unity.Interception.Configuration.dll" />
+      <_UnityIocReference Include="C:\refs\Unity.RegistrationByConvention.dll" />
+      <_UnityIocReference Include="C:\refs\Unity.Microsoft.DependencyInjection.dll" />
+    </ItemGroup>
+    <B44EngineBoundaryTask ProjectName="Fixture.Core" References="@(_UnityIocReference)"
+                           AllowedNames="$(B44EngineReferenceAllow)" FailOnViolation="false">
+      <Output TaskParameter="ViolationCount" PropertyName="_UnityIocViolations" />
+    </B44EngineBoundaryTask>
+    <Error Condition="'$(_UnityIocViolations)' != '0'"
+           Text="The default B44EngineReferenceAllow list no longer exempts the Unity IoC container; got '$(_UnityIocViolations)' violation(s). That list is the whole reason the Unity.* prefix can stay broad." />
+
+    <!-- ...and no exemption may reach the engine modules it exists to leave
+         alone. A default allowlist that grew too wide would fail open. -->
+    <ItemGroup>
+      <_UnityEngineModule Include="C:\refs\Unity.Mathematics.dll" />
+      <_UnityEngineModule Include="C:\refs\Unity.Collections.dll" />
+      <_UnityEngineModule Include="C:\refs\Unity.Burst.dll" />
+      <_UnityEngineModule Include="C:\refs\Unity.InputSystem.dll" />
+      <_UnityEngineModule Include="C:\refs\Unity.Netcode.Runtime.dll" />
+      <_UnityEngineModule Include="C:\refs\Unity.RenderPipelines.Core.Runtime.dll" />
+    </ItemGroup>
+    <B44EngineBoundaryTask ProjectName="Fixture.Core" References="@(_UnityEngineModule)"
+                           AllowedNames="$(B44EngineReferenceAllow)" FailOnViolation="false">
+      <Output TaskParameter="ViolationCount" PropertyName="_UnityModuleViolations" />
+    </B44EngineBoundaryTask>
+    <Error Condition="'$(_UnityModuleViolations)' != '6'"
+           Text="Expected all 6 Unity engine package modules to be rejected with the default allowlist applied; got '$(_UnityModuleViolations)'. An exemption is too wide." />
+
+    <!-- A wildcard exemption has to survive being written as one. -->
+    <B44EngineBoundaryTask ProjectName="Fixture.Core" References="@(_UnityEngineModule)"
+                           AllowedNames="Unity.Render*;Unity.Netcode.*" FailOnViolation="false">
+      <Output TaskParameter="ViolationCount" PropertyName="_WildcardAllowViolations" />
+    </B44EngineBoundaryTask>
+    <Error Condition="'$(_WildcardAllowViolations)' != '4'"
+           Text="A wildcard exemption did not apply (expected 4 of 6 still rejected, got '$(_WildcardAllowViolations)'). MSBuild expands a wildcard in an item Include against the filesystem, which is why this list is a property, not an item." />
+
+    <!-- The explicit escape hatch, for a name the default list does not know. -->
+    <ItemGroup>
+      <_CollidingReference Include="C:\refs\Contoso.Unity.Widgets.dll" />
     </ItemGroup>
     <B44EngineBoundaryTask ProjectName="Fixture.Core" References="@(_CollidingReference)"
-                           AllowedNames="@(_CollidingAllow)" FailOnViolation="false">
+                           AllowedNames="Contoso.Unity.Widgets" FailOnViolation="false">
       <Output TaskParameter="ViolationCount" PropertyName="_AllowedViolations" />
     </B44EngineBoundaryTask>
     <Error Condition="'$(_AllowedViolations)' != '0'"
@@ -177,6 +245,7 @@
            Packages/manifest.json is Unity's tracked package manifest. -->
       <_CleanTrackedFile Include="src/Game.cs" />
       <_CleanTrackedFile Include="Scenes/Player.tscn" />
+      <_CleanTrackedFile Include="Scenes/Player.cs" />
       <_CleanTrackedFile Include="Scenes/Player.cs.uid" />
       <_CleanTrackedFile Include="Scenes/Player.tscn.import" />
       <_CleanTrackedFile Include="Packages/manifest.json" />
@@ -207,16 +276,24 @@
       <_DirtyTrackedFile Include="~$Design.docx" />
       <_DirtyTrackedFile Include="docs/Screenshot 2026-08-01.png" />
       <_DirtyTrackedFile Include="tools/helper.exe" />
-      <!-- Clean entries mixed in: a rule that flags everything proves nothing. -->
+      <!-- An orphaned sidecar: the script it identifies is gone, so the file
+           left behind describes nothing. Committing every LIVE .uid is
+           required; keeping a dead one is the mistake. -->
+      <_DirtyTrackedFile Include="Scenes/Removed.cs.uid" />
+      <!-- Clean entries mixed in: a rule that flags everything proves nothing.
+           Player.cs is tracked, so its sidecars are correctly paired. -->
       <_DirtyTrackedFile Include="src/Game.cs" />
+      <_DirtyTrackedFile Include="Scenes/Player.cs" />
       <_DirtyTrackedFile Include="Scenes/Player.cs.uid" />
+      <_DirtyTrackedFile Include="Scenes/Player.tscn" />
+      <_DirtyTrackedFile Include="Scenes/Player.tscn.import" />
     </ItemGroup>
     <B44RepositoryHygieneTask TrackedFiles="@(_DirtyTrackedFile)" CheckBinaries="true"
                               FailOnViolation="false">
       <Output TaskParameter="ViolationCount" PropertyName="_DirtyHygieneViolations" />
     </B44RepositoryHygieneTask>
-    <Error Condition="'$(_DirtyHygieneViolations)' != '15'"
-           Text="Expected 15 hygiene violations across the debris classes; got '$(_DirtyHygieneViolations)'. A debris class is no longer detected, or a clean file was flagged." />
+    <Error Condition="'$(_DirtyHygieneViolations)' != '16'"
+           Text="Expected 16 hygiene violations across the debris classes; got '$(_DirtyHygieneViolations)'. A debris class is no longer detected, or a clean file was flagged." />
 
     <!-- Repositories that commit native plugins on purpose turn the binary
          family off wholesale, or exempt exact paths. -->

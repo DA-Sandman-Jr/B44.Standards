@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Positive probe: a project that brings its own runsettings and keeps the
+       floor. Never built; see ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsTestProject>true</IsTestProject>
+    <RunSettingsFilePath>$(MSBuildThisFileDirectory)Good.runsettings</RunSettingsFilePath>
+  </PropertyGroup>
+</Project>

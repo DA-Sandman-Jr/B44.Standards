@@ -1,0 +1,1 @@
+M:Contoso.World.Terrain.SetHeight(System.Int32,System.Int32,System.Single);Engine-facing code reads terrain but never mutates it; route mutation through the simulation layer

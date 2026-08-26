@@ -26,12 +26,28 @@ Opt-in flags:
   directly. The engine list is flat and deliberately short: it names the
   engines B44 actually integrates, and is not an extensible engine-policy
   mechanism. Set it on the engine-free test project too — the suite has to run
-  on a machine with no engine installed. A non-engine assembly that collides
-  with a prefix (`Unity.Container`, say) is exempted by name with
-  `<B44EngineReferenceAllow Include="Unity.Container" />`.
+  on a machine with no engine installed.
+
+  `Unity.*` is matched broadly on purpose: Unity ships engine functionality
+  across an open-ended set of package modules, and a check that enumerated them
+  would fail open the day Unity adds one. The collisions are named instead —
+  `B44EngineReferenceAllow` exempts the Unity IoC container by default, and a
+  project extends it with
+  `<B44EngineReferenceAllow>$(B44EngineReferenceAllow);Contoso.Unity.Widgets</B44EngineReferenceAllow>`
+  (semicolon separated, `*` allowed).
 - `<B44EngineFreeCore>true</B44EngineFreeCore>` — the engine-free Core of a game
   or shared package: implies `B44EngineFree` and, because a Core is also the
   deterministic authority, `B44Deterministic`.
+- `<B44BannedSymbols Include="BannedSymbols.Terrain.txt" />` — a repository's
+  own banned-symbol list, registered the same way B44.Standards registers its
+  engine and determinism lists. An architectural rule that can be written as an
+  exact set of members ("engine code reads terrain but never mutates it") stops
+  depending on review catching it. Put the item on the projects the rule
+  governs, not repository-wide, or it will also ban the layer that legitimately
+  owns the operation. The file name must start with `BannedSymbols` and end
+  with `.txt` — that is what the analyzer matches on, and a list named anything
+  else is carried through the build and never read, which the build now
+  rejects rather than ignoring.
 - `<B44SecuritySensitive>true</B44SecuritySensitive>` — enables every built-in
   SDK Security rule and pins the rule level to the project's target framework
   (`8.0-all` for `net8.0`, `10.0-all` for `net10.0`). Set this in
@@ -57,7 +73,11 @@ Always on, and green across every current consumer:
 - **Zero discovered tests is a failure.** VSTest projects without their own
   runsettings get `TreatNoTestsAsError`. It is a floor of one, not an expected
   count, so it never becomes a brittle number to update. Microsoft.Testing
-  Platform already enforces the same floor.
+  Platform already enforces the same floor itself. A project that supplies its
+  own runsettings replaces the shipped default and loses the floor with it —
+  that is a warning (`B44T003`), not an error, because supplying runsettings is
+  an ordinary configuration choice; add `TreatNoTestsAsError` to your own file.
+  Nothing can see `dotnet test --settings`, which bypasses MSBuild.
 - **Reference policy.** Production projects may not reference a `*.Tests`
   project. Internal `B44.*` packages may not use an unbounded `*` version (an
   exact pin is a warning, not an error).
@@ -67,8 +87,11 @@ Opt-in, one line each in `Directory.Build.props`:
 - `<B44HygieneEnabled>true</B44HygieneEnabled>` — fails the build when git
   tracks generated output, engine/tool caches, logs, backups, merge-conflict
   leftovers, editor lock files, ad-hoc screenshots, or stray binaries and
-  archives. Godot `.uid` sidecars, Godot `.import` files, Wavefront `.obj`
-  models and Unity's `Packages/manifest.json` are never flagged. Exempt paths
+  archives, and sidecars left behind by a file that no longer exists (a `.uid`
+  or `.import` whose principal is untracked). Live Godot `.uid` and `.import`
+  sidecars, Wavefront `.obj` models and Unity's `Packages/manifest.json` are
+  never flagged — committing every live sidecar is required, and only a dead
+  one is debris. Exempt paths
   with `<B44HygieneAllow>tools/*.exe;native/libfoo.so</B44HygieneAllow>`, or
   turn the binary family off entirely with `B44HygieneBinaries=false`. Anchor
   and repository root default to the ratchet's.

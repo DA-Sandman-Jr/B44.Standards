@@ -31,6 +31,25 @@
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)../config/BannedSymbols.Unity.txt" />
   </ItemGroup>
 
+  <!-- Repository-owned banned-symbol lists:
+
+         <B44BannedSymbols Include="$(MSBuildThisFileDirectory)BannedSymbols.Terrain.txt" />
+
+       An architectural rule that is cheap to state as "this layer must not call
+       these members" — engine code reads terrain but never mutates it; all
+       world mutation goes through the simulation layer — is enforceable today
+       with the mechanism B44.Standards already uses for its own boundaries.
+       This registers a repository's own list the same way, so the rule stops
+       depending on review catching it forever.
+
+       It deliberately does NOT try to analyse mutation in general. It expresses
+       one repository's known ownership rule as an exact list of members, which
+       is the only form that stays objectively decidable. Where the rule is not
+       known exactly, it belongs in that repository's own architecture tests. -->
+  <ItemGroup>
+    <AdditionalFiles Include="@(B44BannedSymbols)" />
+  </ItemGroup>
+
   <UsingTask
     TaskName="B44EngineBoundaryTask"
     TaskFactory="RoslynCodeTaskFactory"
@@ -44,9 +63,13 @@
       <!-- Resolved analyzers and source generators. An engine generator is an
            engine dependency that never appears in @(ReferencePath). -->
       <Analyzers ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
-      <!-- Assembly names (extension optional) exempted by the consumer, for the
-           rare non-engine package that collides with an engine prefix. -->
-      <AllowedNames ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
+      <!-- Semicolon-separated assembly names (a trailing .dll is optional)
+           exempt from the check, with '*' matching any run of characters. A
+           STRING and not an item list for the same reason as the hygiene
+           allowlist: MSBuild expands a wildcard in an item Include against the
+           filesystem, so "Unity.Interception*" written as an item would
+           silently become an empty exemption. -->
+      <AllowedNames ParameterType="System.String" Required="false" />
       <!-- The shipped target passes FailOnViolation=true. It exists so the
            build-only fixture can assert ViolationCount without its own
            deliberate violations failing the fixture's build. -->
@@ -56,18 +79,22 @@
     <Task>
       <Code Type="Fragment" Language="cs">
         <![CDATA[
-        var allowed = new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
-        foreach (var item in AllowedNames ?? System.Array.Empty<Microsoft.Build.Framework.ITaskItem>())
+        var allowed = new System.Collections.Generic.List<System.Text.RegularExpressions.Regex>();
+        foreach (var entry in (AllowedNames ?? string.Empty).Split(';'))
         {
             // Trim only a real assembly extension. GetFileNameWithoutExtension
             // would turn the allowed name "Unity.Container" into "Unity",
             // which then matches nothing and silently voids the exemption.
-            var allowedName = (item.ItemSpec ?? string.Empty).Trim();
+            var allowedName = entry.Trim();
             if (allowedName.EndsWith(".dll", System.StringComparison.OrdinalIgnoreCase))
             {
                 allowedName = allowedName.Substring(0, allowedName.Length - 4);
             }
-            if (allowedName.Length > 0) allowed.Add(allowedName);
+            if (allowedName.Length == 0) continue;
+
+            allowed.Add(new System.Text.RegularExpressions.Regex(
+                "^" + System.Text.RegularExpressions.Regex.Escape(allowedName).Replace("\\*", ".*") + "$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase));
         }
 
         var violations = 0;
@@ -86,7 +113,7 @@
                 if (spec.Length == 0) continue;
 
                 var name = System.IO.Path.GetFileNameWithoutExtension(spec);
-                if (allowed.Contains(name)) continue;
+                if (allowed.Exists(candidate => candidate.IsMatch(name))) continue;
 
                 string message = null;
                 if (name.StartsWith("Godot", System.StringComparison.OrdinalIgnoreCase))
@@ -102,7 +129,7 @@
                     message = ProjectName + " is engine-free but resolves a Unity " + kind + " (" + name +
                         "). Remove the Unity dependency; the project must build and test without an engine. " +
                         "Unity-facing code belongs in the B44.Unity integration package. If this assembly is not " +
-                        "a Unity engine assembly, exempt it with <B44EngineReferenceAllow Include=\"" + name + "\" />.";
+                        "a Unity engine assembly, append its name to the B44EngineReferenceAllow property.";
                 }
 
                 if (message == null) continue;
@@ -135,8 +162,31 @@
       ProjectName="$(MSBuildProjectName)"
       References="@(ReferencePath)"
       Analyzers="@(Analyzer)"
-      AllowedNames="@(B44EngineReferenceAllow)"
+      AllowedNames="$(B44EngineReferenceAllow)"
       FailOnViolation="true" />
+  </Target>
+
+  <!-- Repository-owned lists are validated on their own, before anything is
+       compiled: both failure modes here are decidable from the project file,
+       and neither needs the reference graph. -->
+  <Target Name="B44VerifyBannedSymbolLists"
+          BeforeTargets="PrepareForBuild"
+          Condition="'@(B44BannedSymbols)' != ''">
+    <ItemGroup>
+      <!-- A path that does not exist bans nothing and reports nothing. -->
+      <_B44MissingBannedSymbols Include="@(B44BannedSymbols)" Condition="!Exists('%(FullPath)')" />
+      <!-- The analyzer only reads AdditionalFiles whose name starts with
+           "BannedSymbols" and ends with ".txt". A list named anything else is
+           registered, carried through the build, and never read. -->
+      <_B44MisnamedBannedSymbols Include="@(B44BannedSymbols)"
+                                 Condition="!$([System.String]::new('%(Filename)').StartsWith('BannedSymbols')) or '%(Extension)' != '.txt'" />
+    </ItemGroup>
+    <Error Condition="'@(_B44MissingBannedSymbols)' != ''"
+           Code="B44E004"
+           Text="$(MSBuildProjectName) registers banned-symbol list(s) that do not exist: @(_B44MissingBannedSymbols->'%(Identity)', ', '). A missing list bans nothing and reports nothing, so the boundary it was written for is unenforced." />
+    <Error Condition="'@(_B44MisnamedBannedSymbols)' != ''"
+           Code="B44E005"
+           Text="$(MSBuildProjectName) registers banned-symbol list(s) the analyzer will never read: @(_B44MisnamedBannedSymbols->'%(Filename)%(Extension)', ', '). The file name must start with 'BannedSymbols' and end with '.txt' (BannedSymbols.Terrain.txt, say); anything else is carried through the build as an AdditionalFile and silently ignored." />
   </Target>
 
   <!-- The banned-symbol lists are inert unless a banned-API analyzer is
@@ -145,24 +195,25 @@
        excluding analyzer assets, by importing this policy from a sibling clone
        without the matching PackageReference, or by suppressing RS0030. Each of
        those leaves a project that looks guarded and is not — so the guard
-       checks that it is switched on instead of assuming it. -->
-  <!-- '$(TargetFramework)' != '' skips the OUTER build of a multi-targeted
+       checks that it is switched on instead of assuming it.
+
+       '$(TargetFramework)' != '' skips the OUTER build of a multi-targeted
        project. That pass resolves no analyzers by design and dispatches to the
        inner builds, where the real check runs once per framework; without this
        an invocation that reaches ResolveReferences on the outer build would
        report every multi-targeted package as unguarded. -->
   <Target Name="B44VerifyBannedSymbolGuard"
           AfterTargets="ResolveReferences"
-          Condition="('$(B44EngineFree)' == 'true' or '$(B44Deterministic)' == 'true') and '$(B44VerifyBannedSymbolGuard)' != 'false' and '$(TargetFramework)' != ''">
+          Condition="('$(B44EngineFree)' == 'true' or '$(B44Deterministic)' == 'true' or '@(B44BannedSymbols)' != '') and '$(B44VerifyBannedSymbolGuard)' != 'false' and '$(TargetFramework)' != ''">
     <ItemGroup>
       <_B44BannedApiAnalyzer Include="@(Analyzer)"
-                             Condition="$([System.String]::new('%(FileName)').Contains('BannedApiAnalyzers'))" />
+                             Condition="$([System.String]::new('%(Filename)').Contains('BannedApiAnalyzers'))" />
     </ItemGroup>
     <Error Condition="'@(_B44BannedApiAnalyzer)' == ''"
            Code="B44E002"
-           Text="$(MSBuildProjectName) enables a B44 banned-symbol boundary (B44EngineFree/B44Deterministic) but no banned-API analyzer is loaded, so every BannedSymbols entry is inert and the boundary is unenforced. Restore the Microsoft.CodeAnalysis.BannedApiAnalyzers reference that B44.Standards brings in, and do not exclude analyzer assets from the B44.Standards PackageReference." />
+           Text="$(MSBuildProjectName) enables a B44 banned-symbol boundary (B44EngineFree, B44Deterministic, or B44BannedSymbols) but no banned-API analyzer is loaded, so every banned entry is inert and the boundary is unenforced. Restore the Microsoft.CodeAnalysis.BannedApiAnalyzers reference that B44.Standards brings in, and do not exclude analyzer assets from the B44.Standards PackageReference." />
     <Error Condition="$(NoWarn.Contains('RS0030'))"
            Code="B44E003"
-           Text="$(MSBuildProjectName) suppresses RS0030 through NoWarn, which disables every B44 banned-symbol boundary in this project. Remove RS0030 from NoWarn; if one symbol genuinely needs an exception, raise it against the BannedSymbols list in B44.Standards." />
+           Text="$(MSBuildProjectName) suppresses RS0030 through NoWarn, which disables every banned-symbol boundary in this project. Remove RS0030 from NoWarn; if one symbol genuinely needs an exception, raise it against the list that bans it." />
   </Target>
 </Project>

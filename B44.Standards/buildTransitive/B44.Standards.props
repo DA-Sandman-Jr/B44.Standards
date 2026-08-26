@@ -13,6 +13,22 @@
          B44.globalconfig opts individual rules back in. -->
     <MeziantouAnalysisMode Condition="'$(MeziantouAnalysisMode)' == ''">None</MeziantouAnalysisMode>
 
+    <!-- Assembly names exempt from the engine-boundary check, semicolon
+         separated, with '*' matching any run of characters.
+
+         The check matches "Unity.*" broadly and on purpose: Unity ships engine
+         functionality across an open-ended set of package modules
+         (Unity.Mathematics, Unity.Collections, Unity.Burst, Unity.InputSystem,
+         Unity.Netcode.*, Unity.Entities, Unity.RenderPipelines.*, ...) and a
+         guard that enumerated them would fail open the day Unity adds one.
+         Matching broadly and naming the exceptions fails closed instead.
+
+         The exceptions below are the Unity *IoC container* — an unrelated .NET
+         DI library that predates the engine's package naming and is the one
+         real collision. Extend per project, never narrow the prefix:
+         <B44EngineReferenceAllow>$(B44EngineReferenceAllow);Contoso.Unity.Widgets</B44EngineReferenceAllow> -->
+    <B44EngineReferenceAllow Condition="'$(B44EngineReferenceAllow)' == ''">Unity.Abstractions;Unity.Container;Unity.Configuration;Unity.Interception;Unity.Interception.Configuration;Unity.RegistrationByConvention;Unity.ServiceLocation;Unity.Microsoft.DependencyInjection</B44EngineReferenceAllow>
+
     <!-- Project-wide NoWarn codes B44VerifyWarningPolicy accepts (that check
          is opt-in; see B44.ProjectPolicy.targets). CS1591 is portfolio-wide:
          doc files are generated to enable IDE0005, not to document every
