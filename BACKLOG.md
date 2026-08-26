@@ -81,11 +81,11 @@ which is why that check is opt-in rather than always on.
   regenerated its sidecar is a real, recurring failure, but detecting it needs
   the Godot project root and the knowledge that generation requires opening the
   editor — engine-specific, and UIDs must never be fabricated outside Godot to
-  satisfy a check. Follow-up owned by **B44.Godot**: over `git ls-files`, for
-  every tracked `*.cs` under a directory containing `project.godot`, require a
-  sibling `*.cs.uid`; report the missing ones as "open the Godot editor and
-  commit the generated sidecars", never write one. The general half — orphaned
-  sidecars, which need no engine knowledge — shipped in Standards instead.
+  satisfy a check. **Delivered in B44.Godot** on 2026-08-26 as
+  `reusable-godot-uid-check.yml`, which reports tracked scripts with no
+  committed sidecar and never writes one. The general half — orphaned sidecars,
+  which need no engine knowledge — shipped here instead, and found seven in
+  WhispersOfTheEarth on its first real run.
 
 #### Rejected in this pass
 
@@ -182,7 +182,9 @@ whether a design abstraction is justified. Those remain semantic decisions.
 
 ### Retrofit the 0.12.0 guardrails into existing consumers
 
-**Status:** **Planned** since 2026-08-25, after 0.12.0 publishes.
+**Status:** **Done** on 2026-08-26, except `Continuity`, which is blocked on the
+MA0002 decision above. Eleven of twelve consumers are on `0.12.*` and green;
+what follows is the record of what the rollout found.
 
 The always-on checks arrive with the float boundary and need no consumer work.
 The opt-in ones do, one line each per repository, and two repositories have real
@@ -213,6 +215,35 @@ findings waiting for them:
   reference graph and that suite cannot run on an engine-free runner today.
   Moving the tested logic into `Whispers.Core` is the fix; enabling the flag
   first would only turn the build red.
+
+### Decide whether MA0002 belongs in the test severity overlay
+
+**Status:** **Planned** since 2026-08-26, found during the 0.12.0 consumer rollout.
+
+Standards 0.10.x moved Meziantou.Analyzer from 3.0.123 to 3.0.138, which
+widened MA0002 to xunit's `Assert.Contains(string, IEnumerable<string>)`
+overloads. Eleven of the twelve consumers never noticed, because their test
+suites do not use that pattern. `Continuity` does: crossing from `0.6.*` to
+`0.12.*` raises 50 MA0002 diagnostics across 25 call sites in nine test files,
+and it is the only repository that could not adopt 0.12.0.
+
+Every one of those call sites is an assertion comparing string literals, where
+the default comparer is already ordinal. The fix at each site is mechanical and
+behaviour-neutral, which is exactly what makes 25 of them the wrong answer: the
+question is whether MA0002 is telling a test suite something worth knowing.
+`B44.Tests.globalconfig` already relaxes CA1707, CA1816 and CA1861 for tests
+on that reasoning.
+
+Decide one of: relax MA0002 in the test overlay (a patch, since it narrows
+enforcement); leave it and accept the migration in the one repository that
+hits it; or narrow it some other way. Whichever way it goes, `Continuity`
+adopts 0.12.0 immediately afterwards — its two real defects are already fixed
+and merged, and it is green on `0.6.*`.
+
+This also records a gap in how that analyzer bump was measured: the hard rule
+is to measure an analyzer upgrade against every active consumer before
+publishing, and three consumers were on `0.6.*` and therefore untested against
+3.0.138 at the time.
 
 ## Known defects
 
