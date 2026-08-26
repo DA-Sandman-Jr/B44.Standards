@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Negative probe: a real, populated list the analyzer will never read,
+       because it does not follow the BannedSymbols*.txt naming the analyzer
+       matches on. Never built; see ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <B44BannedSymbols Include="$(MSBuildThisFileDirectory)ArchitectureRules.txt" />
+  </ItemGroup>
+</Project>

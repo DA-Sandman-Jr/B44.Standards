@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Negative probe: a repository-owned banned-symbol list whose path does not
+       exist. It bans nothing and reports nothing. Never built; see
+       ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <B44BannedSymbols Include="$(MSBuildThisFileDirectory)BannedSymbols.Absent.txt" />
+  </ItemGroup>
+</Project>

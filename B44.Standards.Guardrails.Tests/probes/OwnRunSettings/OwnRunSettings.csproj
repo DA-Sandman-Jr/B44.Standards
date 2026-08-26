@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Negative probe: a VSTest project that brings its own runsettings and
+       loses the zero-discovered-tests floor with it. IsTestProject is set
+       directly rather than by referencing the test SDK, because a probe is
+       never restored. Never built; see ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsTestProject>true</IsTestProject>
+    <RunSettingsFilePath>$(MSBuildThisFileDirectory)Own.runsettings</RunSettingsFilePath>
+  </PropertyGroup>
+</Project>

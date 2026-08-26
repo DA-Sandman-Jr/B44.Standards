@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Positive probe: a correctly named, existing repository-owned list. A
+       check that rejected every list would pass its negative tests and still be
+       useless. Never built; see ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <B44BannedSymbols Include="$(MSBuildThisFileDirectory)BannedSymbols.Probe.txt" />
+  </ItemGroup>
+</Project>

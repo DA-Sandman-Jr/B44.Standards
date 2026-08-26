@@ -49,6 +49,17 @@ asserts both detection and build failure.
   `#pragma warning disable` / `SuppressMessage` occurrences fail the build.
 - **Warning policy** (opt-in). Warnings-as-errors, nullable, analyzers enabled,
   and a bounded project-wide `NoWarn`.
+- **Repository-owned banned-symbol lists.** `B44BannedSymbols` registers a
+  repository's own list through the mechanism B44.Standards already uses for
+  its engine and determinism boundaries, so an architectural rule that can be
+  written as an exact set of members is enforced instead of reviewed forever.
+  The build rejects a list that does not exist, and one whose name the analyzer
+  will never match — both of which are otherwise silently inert.
+- **Orphaned sidecars.** A tracked `.uid` or `.import` whose principal file is
+  not tracked is debris; every live one must stay committed. Decidable from the
+  tracked file list alone, with no engine knowledge.
+- **Consumer runsettings that drop the zero-tests floor** (`B44T003`, a
+  warning).
 
 Measured before adoption: every consumer already uses bounded internal package
 floats; no production project references a test project; no consumer would fail
@@ -56,6 +67,25 @@ the always-on checks. Two consumers carry committed debris that the opt-in
 hygiene check reports when they enable it, which is the check paying for itself
 rather than a migration cost. Two consumers do not yet run warnings-as-errors,
 which is why that check is opt-in rather than always on.
+
+#### Deliberately left repository-specific
+
+- **Public and mutation API surface.** A helper made public with one internal
+  caller, and mutation APIs left public against an intended boundary, are real
+  and worth catching — but the ownership rule is known only inside the
+  repository that holds it. Where the rule can be written as an exact member
+  list, `B44BannedSymbols` now enforces it; where it cannot, it belongs in that
+  repository's own architecture tests. Standards does not cap API size, does
+  not internalize APIs by caller count, and does not infer boundaries.
+- **Missing Godot `.uid` sidecars.** A new `.cs` committed before the editor
+  regenerated its sidecar is a real, recurring failure, but detecting it needs
+  the Godot project root and the knowledge that generation requires opening the
+  editor — engine-specific, and UIDs must never be fabricated outside Godot to
+  satisfy a check. Follow-up owned by **B44.Godot**: over `git ls-files`, for
+  every tracked `*.cs` under a directory containing `project.godot`, require a
+  sibling `*.cs.uid`; report the missing ones as "open the Godot editor and
+  commit the generated sidecars", never write one. The general half — orphaned
+  sidecars, which need no engine knowledge — shipped in Standards instead.
 
 #### Rejected in this pass
 
@@ -74,6 +104,21 @@ which is why that check is opt-in rather than always on.
 - **Enforcing `TreatWarningsAsErrors` for every consumer.** Two active
   consumers would turn red on upgrade with no defect behind it; that is a flag
   day, not a guardrail.
+- **Proving prose guidance complete.** Generated mirrors are verified against
+  their source; asserting that hand-authored documentation describes every type
+  or matches every count is not mechanically decidable, and a check that
+  approximated it would be worse than none.
+- **Automated duplicate-code promotion.** A UI scaling function appearing in
+  two games is an extraction candidate for a person to judge. Whether two
+  near-identical functions are the same concept is a design decision;
+  organization guidance now says where to record the candidate.
+- **Universal mutation analysis.** The engine-reads-but-does-not-mutate rule is
+  enforceable as an exact member list. Inferring mutation boundaries in general
+  is not, and would produce a rule nobody could trust.
+- **A generalized guardrail framework.** Every check added here reuses a
+  mechanism the portfolio already runs — banned symbols, the ratchet's anchor
+  pattern, MSBuild items, `git ls-files` — rather than introducing a new
+  abstraction over them.
 
 #### Still to evaluate
 
@@ -153,6 +198,13 @@ findings waiting for them:
 - Enable `B44WarningPolicy` where warnings already fail the build. `TicTacHoe`
   and `BeforeForeverAfter` need `TreatWarningsAsErrors` first; treat that as
   their own scheduled work, not a Standards flag day.
+- `WhispersOfTheEarth.Tests` supplies its own runsettings for platform pinning,
+  so it keeps that file and never gains the zero-discovered-tests floor. Adding
+  `<TreatNoTestsAsError>true</TreatNoTestsAsError>` to
+  `WhispersOfTheEarth.Tests.runsettings` closes it; `B44T003` warns until then.
+- `B44.GameSystems` currently fails `-p:B44AgentSyncVerifyOnly=true` with a
+  stale generated `AGENTS.md`. That is the existing synchronization check doing
+  its job, not new enforcement; regenerate it in that repository.
 - Set `B44EngineFree` on each engine-free test project, replacing the pasted
   `PreventGodotDependencies` target the pre-template repositories carry. One
   repository needs design work before it can adopt this rather than a
