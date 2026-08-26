@@ -20,7 +20,7 @@
     "standardsVersion": {
       "type": "parameter",
       "datatype": "string",
-      "defaultValue": "0.10.*",
+      "defaultValue": "0.11.*",
       "replaces": "B44_STANDARDS_VERSION",
       "description": "Compatibility-bounded float for B44.Standards. Pre-1.0 packages use 0.<minor>.*; crossing a minor is deliberate."
     },

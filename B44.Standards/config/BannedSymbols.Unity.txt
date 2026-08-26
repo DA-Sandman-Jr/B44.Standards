@@ -1,0 +1,2 @@
+N:UnityEngine;Unity belongs in the B44.Unity integration package, never in an engine-free Core
+N:UnityEditor;Unity belongs in the B44.Unity integration package, never in an engine-free Core

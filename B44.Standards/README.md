@@ -19,9 +19,11 @@ Opt-in flags:
 - `<B44Deterministic>true</B44Deterministic>` — bans ambient time/randomness
   (`DateTime.Now`, `new Random()`, …); inject `TimeProvider` / an explicit random
   source instead.
-- `<B44EngineFreeCore>true</B44EngineFreeCore>` — additionally bans Godot APIs and
-  fails the build if a Godot assembly reaches the resolved reference graph
-  (implies determinism).
+- `<B44EngineFreeCore>true</B44EngineFreeCore>` — additionally bans Godot and
+  Unity APIs and fails the build if a Godot or Unity assembly reaches the
+  resolved reference graph (implies determinism). The engine list is flat and
+  deliberately short: it names the engines B44 actually integrates, and is not
+  an extensible engine-policy mechanism.
 - `<B44SecuritySensitive>true</B44SecuritySensitive>` — enables every built-in
   SDK Security rule and pins the rule level to the project's target framework
   (`8.0-all` for `net8.0`, `10.0-all` for `net10.0`). Set this in
@@ -47,7 +49,7 @@ Local builds update managed files, while
 
 All B44 repositories, including released and production consumers, reference
 internal packages through a compatibility-bounded float. Pre-1.0 packages use
-`0.<minor>.*` (the current consumer boundary is `0.10.*`); stable packages use
+`0.<minor>.*` (the current consumer boundary is `0.11.*`); stable packages use
 `<major>.*`. Breaking changes bump the excluded minor or major boundary and
 require a deliberate consumer edit. Never use an unbounded `*`. Changes that
 expand Standards enforcement bump the Standards minor version rather than
