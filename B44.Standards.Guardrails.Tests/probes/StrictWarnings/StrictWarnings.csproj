@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Positive probe for B44VerifyWarningPolicy: adds nothing, so it inherits
+       this repository's conforming settings. A policy that rejects everything
+       would pass its negative test and still be useless. Never built; see
+       ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+</Project>

@@ -13,6 +13,13 @@
          B44.globalconfig opts individual rules back in. -->
     <MeziantouAnalysisMode Condition="'$(MeziantouAnalysisMode)' == ''">None</MeziantouAnalysisMode>
 
+    <!-- Project-wide NoWarn codes B44VerifyWarningPolicy accepts (that check
+         is opt-in; see B44.ProjectPolicy.targets). CS1591 is portfolio-wide:
+         doc files are generated to enable IDE0005, not to document every
+         member. Defined here, in the early-imported props, so a project can
+         extend it: <B44AllowedNoWarn>$(B44AllowedNoWarn);NU5128</B44AllowedNoWarn>. -->
+    <B44AllowedNoWarn Condition="'$(B44AllowedNoWarn)' == ''">CS1591</B44AllowedNoWarn>
+
     <!-- Vulnerable-dependency audit on restore, direct AND transitive.
          Explicit because net8/net10 SDKs have shipped different defaults. -->
     <NuGetAudit Condition="'$(NuGetAudit)' == ''">true</NuGetAudit>

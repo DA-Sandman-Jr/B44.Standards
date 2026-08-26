@@ -13,6 +13,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "templates", "templates", "{
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "B44.Templates", "templates\B44.Templates\B44.Templates.csproj", "{36B0B338-87F4-4E7F-88F8-F7CB72FF746F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "B44.Standards.Guardrails.Tests", "B44.Standards.Guardrails.Tests\B44.Standards.Guardrails.Tests.csproj", "{32447355-9A0E-402F-AE38-962DB3A40CCE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -71,6 +73,18 @@ Global
 		{36B0B338-87F4-4E7F-88F8-F7CB72FF746F}.Release|x64.Build.0 = Release|Any CPU
 		{36B0B338-87F4-4E7F-88F8-F7CB72FF746F}.Release|x86.ActiveCfg = Release|Any CPU
 		{36B0B338-87F4-4E7F-88F8-F7CB72FF746F}.Release|x86.Build.0 = Release|Any CPU
+		{32447355-9A0E-402F-AE38-962DB3A40CCE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{32447355-9A0E-402F-AE38-962DB3A40CCE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{32447355-9A0E-402F-AE38-962DB3A40CCE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{32447355-9A0E-402F-AE38-962DB3A40CCE}.Debug|x64.Build.0 = Debug|Any CPU
+		{32447355-9A0E-402F-AE38-962DB3A40CCE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{32447355-9A0E-402F-AE38-962DB3A40CCE}.Debug|x86.Build.0 = Debug|Any CPU
+		{32447355-9A0E-402F-AE38-962DB3A40CCE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{32447355-9A0E-402F-AE38-962DB3A40CCE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{32447355-9A0E-402F-AE38-962DB3A40CCE}.Release|x64.ActiveCfg = Release|Any CPU
+		{32447355-9A0E-402F-AE38-962DB3A40CCE}.Release|x64.Build.0 = Release|Any CPU
+		{32447355-9A0E-402F-AE38-962DB3A40CCE}.Release|x86.ActiveCfg = Release|Any CPU
+		{32447355-9A0E-402F-AE38-962DB3A40CCE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

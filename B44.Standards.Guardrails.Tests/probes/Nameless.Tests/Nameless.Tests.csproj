@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Negative probe for B44VerifyTestProjectIntegrity: named as a test
+       project, declares no test framework, and does not claim the build-only
+       fixture exemption. Never built; see ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+</Project>

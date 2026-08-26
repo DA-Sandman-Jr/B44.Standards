@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Negative probe for the internal-package float rule. Separate from
+       Violating because <Error> ends the target at the first failure, so a
+       probe that trips two rules only ever proves the first. Never built; see
+       ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="B44.Fictional" Version="*" />
+  </ItemGroup>
+</Project>

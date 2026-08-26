@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Positive probe for B44VerifyReferencePolicy. A check that fires on
+       everything proves nothing, so the conforming case is asserted too.
+       Never built; see ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Compliant\Nowhere.csproj" />
+    <PackageReference Include="B44.Fictional" Version="0.3.*" />
+    <PackageReference Include="B44.Fictional.Prerelease" Version="0.1.*-*" />
+  </ItemGroup>
+</Project>

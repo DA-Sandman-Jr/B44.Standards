@@ -21,10 +21,10 @@ The repository publishes two packages:
 Reference the package privately so policy assets affect the build without becoming a runtime dependency:
 
 ```xml
-<PackageReference Include="B44.Standards" Version="0.11.*" PrivateAssets="all" />
+<PackageReference Include="B44.Standards" Version="0.12.*" PrivateAssets="all" />
 ```
 
-The package is conservative by default. Repositories opt into stronger profiles through MSBuild properties such as `B44Deterministic`, `B44EngineFreeCore`, `B44SecuritySensitive`, `B44RatchetEnabled`, and `B44AgentSyncEnabled`. See the [package documentation](B44.Standards/README.md) for configuration details.
+The package is conservative by default. Repositories opt into stronger profiles through MSBuild properties such as `B44Deterministic`, `B44EngineFree`, `B44EngineFreeCore`, `B44SecuritySensitive`, `B44RatchetEnabled`, `B44HygieneEnabled`, `B44SuppressionBudget`, `B44WarningPolicy`, and `B44AgentSyncEnabled`. See the [package documentation](B44.Standards/README.md) for configuration details.
 
 ## Creating a game repository
 
@@ -40,6 +40,7 @@ See the [template documentation](templates/README.md) for parameters and the gen
 - `B44.Standards/` — package assets and canonical guidance.
 - `B44.Standards.AgentGuidance.Tests/` — build fixture for guidance synchronization.
 - `B44.Standards.Ratchet.Tests/` — build fixture for source-size enforcement.
+- `B44.Standards.Guardrails.Tests/` — build fixture for the engine-boundary, repository-hygiene, and suppression-budget guards.
 - `templates/B44.Templates/` — installable project-template package.
 - `.github/workflows/reusable-dotnet-ci.yml` — reusable engine-free .NET CI.
 

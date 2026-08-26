@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Negative probe for the project-wide NoWarn rule, and only that rule. A
+       repository-wide suppression is the subtlest way to make diagnostics
+       disappear, because nothing at the call site shows it. Never built; see
+       ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <NoWarn>$(NoWarn);CS8600</NoWarn>
+  </PropertyGroup>
+</Project>

@@ -13,10 +13,31 @@ _One paragraph: the pitch, the platform, the state of it. Replace this._
 - `GameName.Core/` — engine-free. All rules, state, algorithms, and anything
   worth testing. Sets `B44EngineFreeCore=true`; a Godot reference here fails
   the build.
-- `GameName.Tests/` — xunit.v3 over Core only. Carries a guard target that fails
-  if a Godot dependency reaches the test graph.
+- `GameName.Tests/` — xunit.v3 over Core only. Sets `B44EngineFree=true`, so an
+  engine dependency reaching the test graph fails the build. The suite must run
+  on a machine with no engine installed; CI proves it by using a runner that has
+  none.
 - Godot project at the repository root once it exists; scene controllers stay
   thin and translate at the boundary.
+
+## Build guardrails
+
+Beyond the ratchet below, `B44.Standards` fails this repository's build on:
+
+- an engine assembly or source generator reaching an engine-free project;
+- a banned-symbol boundary whose analyzer is missing, which would leave the ban
+  list silently inert;
+- a `*.Tests` project that declares no test framework, or a Testing Platform
+  project missing `TestingPlatformDotnetTestSupport` — both make `dotnet test`
+  report success without running anything;
+- generated output, logs, or editor debris committed to git;
+- a new analyzer suppression past `B44SuppressionBudget`;
+- warnings not treated as errors, or a project-wide `NoWarn` outside
+  `B44AllowedNoWarn`.
+
+Raising a budget or adding an exemption is a one-line change in this file's
+sibling `Directory.Build.props` — deliberately visible in review rather than
+silent.
 
 ## Ratchet
 

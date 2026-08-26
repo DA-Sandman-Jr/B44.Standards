@@ -22,8 +22,14 @@ jobs:
       - name: Verify synchronized guidance
         run: dotnet build B44.Standards/B44.Standards.csproj -c Debug --no-restore -p:B44AgentSyncVerifyOnly=true
 
-      - name: Build solution
+      # This is the real verification step. Every fixture in this repository is
+      # a build-only MSBuild project: its assertions are <Error> conditions in
+      # build targets, so a broken guardrail fails HERE, not under `dotnet test`.
+      - name: Build solution (runs the guardrail fixtures)
         run: dotnet build B44.Standards.sln -c Debug --no-restore
 
+      # Kept so a future project carrying real xunit tests is picked up
+      # automatically. It currently discovers none, which is why the step above
+      # is the one that must stay green.
       - name: Run tests
         run: dotnet test B44.Standards.sln -c Debug --no-build

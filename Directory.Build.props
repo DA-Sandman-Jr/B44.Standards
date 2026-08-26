@@ -10,6 +10,14 @@
     <B44RatchetRepositoryRoot>$(MSBuildThisFileDirectory)</B44RatchetRepositoryRoot>
     <B44RatchetBaseline>$(MSBuildThisFileDirectory)ratchet-baseline.txt</B44RatchetBaseline>
 
+    <!-- Repository-wide guardrails. Anchor and root default to the ratchet's,
+         so both run once per build from B44.Standards.csproj. The suppression
+         budget is 0 because this repository ships policy, not code: the first
+         analyzer suppression here should have to be argued for in review. -->
+    <B44HygieneEnabled>true</B44HygieneEnabled>
+    <B44SuppressionBudget>0</B44SuppressionBudget>
+    <B44WarningPolicy>true</B44WarningPolicy>
+
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
@@ -20,6 +28,7 @@
   <ItemGroup>
     <B44AgentSyncExclude Include="templates" />
     <B44RatchetExclude Include="B44.Standards.AgentGuidance.Tests" />
+    <B44RatchetExclude Include="B44.Standards.Guardrails.Tests" />
     <B44RatchetExclude Include="B44.Standards.Ratchet.Tests" />
     <B44RatchetExclude Include="templates" />
     <B44RatchetExclude Include="artifacts" />

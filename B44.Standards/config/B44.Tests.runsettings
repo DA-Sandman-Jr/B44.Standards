@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Default VSTest settings for B44 test projects, applied by
+     B44.ProjectPolicy.targets when a project has not chosen its own
+     runsettings. Deliberately minimal: this file exists for one guarantee. -->
+<RunSettings>
+  <RunConfiguration>
+    <!-- VSTest reports a run that discovered zero tests as SUCCESS. A dropped
+         adapter, a broken filter, or a test class that stopped being public
+         then reads as a passing suite. This makes it a failure. It is a floor
+         of one discovered test, not an expected count, so it stays correct as
+         suites grow and never turns into a brittle assertion to update. -->
+    <TreatNoTestsAsError>true</TreatNoTestsAsError>
+  </RunConfiguration>
+</RunSettings>
