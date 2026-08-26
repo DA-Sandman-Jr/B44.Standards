@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Negative probe for the Microsoft.Testing.Platform bridge rule. The
+       property is set directly rather than by referencing xunit.v3: the check
+       reads the property, and a probe is never restored. Never built; see
+       ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsTestingPlatformApplication>true</IsTestingPlatformApplication>
+  </PropertyGroup>
+</Project>

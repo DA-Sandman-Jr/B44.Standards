@@ -1,0 +1,294 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- Named *.Tests but deliberately carries no test framework: every
+         assertion in this project is an MSBuild <Error> in a build target.
+         B44VerifyTestProjectIntegrity exists to catch a REAL test project
+         that lost its framework, so declare the exception rather than
+         disabling the check. -->
+    <B44BuildOnlyFixture>true</B44BuildOnlyFixture>
+
+    <!-- Build-only integration fixture for the boundary, hygiene, and
+         suppression guards, mirroring B44.Standards.Ratchet.Tests. It drives
+         the exact tasks packed by B44.Standards against synthetic inputs.
+
+         Every guard is asserted twice: that it DETECTS the violation
+         (ViolationCount with FailOnViolation=false) and that it FAILS the
+         build on it (FailOnViolation=true under ContinueOnError). A guard that
+         only detects is a report, not a gate. -->
+    <_FixtureRoot>$(MSBuildProjectDirectory)\obj\GuardrailsFixture\</_FixtureRoot>
+
+    <!-- The gate assertions below deliberately provoke real errors and
+         downgrade them so the fixture can inspect the outcome. Demote them
+         further to messages: a green build must not carry warnings that are
+         actually passing negative tests. -->
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44E001;B44H002;B44S001;B44S002</MSBuildWarningsAsMessages>
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44T001;B44T002;B44P002;B44P003;B44W001;B44W006</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+
+  <!-- ── Target-based guards ─────────────────────────────────────────────────
+       B44VerifyReferencePolicy, B44VerifyTestProjectIntegrity and
+       B44VerifyWarningPolicy are MSBuild targets rather than tasks, so they
+       cannot be handed synthetic inputs the way the tasks above can. Each runs
+       against a probe project under probes/ instead.
+
+       Out of process, via `dotnet msbuild`, for one reason: the <MSBuild> task
+       does NOT downgrade errors logged by the project it builds, even under
+       ContinueOnError, so an in-process probe fails this fixture with the very
+       diagnostic it is asserting. The alternative — a property that makes the
+       shipped targets warn instead of error — would put a configuration switch
+       on the gate itself, and a gate a consumer can turn off with a property is
+       not a gate. Each invocation is evaluation-only (a named target, no
+       restore, no build) and costs roughly half a second. -->
+  <Target Name="VerifyProjectPolicyProbes" BeforeTargets="Build">
+    <ItemGroup>
+      <!-- Probe project, the target it exercises, and what it represents. -->
+      <_Probe Include="Violating">
+        <VerifyTarget>B44VerifyReferencePolicy</VerifyTarget>
+        <Why>a production project that references a test project</Why>
+      </_Probe>
+      <_Probe Include="UnboundedFloat">
+        <VerifyTarget>B44VerifyReferencePolicy</VerifyTarget>
+        <Why>an unbounded * float on an internal B44 package</Why>
+      </_Probe>
+      <_Probe Include="Compliant">
+        <VerifyTarget>B44VerifyReferencePolicy</VerifyTarget>
+        <Why>bounded 0.3.* and 0.1.*-* floats with no test reference</Why>
+      </_Probe>
+      <_Probe Include="Nameless.Tests">
+        <VerifyTarget>B44VerifyTestProjectIntegrity</VerifyTarget>
+        <Why>a *.Tests project that declares no test framework</Why>
+      </_Probe>
+      <_Probe Include="Bridgeless.Tests">
+        <VerifyTarget>B44VerifyTestProjectIntegrity</VerifyTarget>
+        <Why>a Testing Platform project with no dotnet-test bridge</Why>
+      </_Probe>
+      <_Probe Include="LooseWarnings">
+        <VerifyTarget>B44VerifyWarningPolicy</VerifyTarget>
+        <Why>warnings that no longer fail the build</Why>
+      </_Probe>
+      <_Probe Include="NoWarnCreep">
+        <VerifyTarget>B44VerifyWarningPolicy</VerifyTarget>
+        <Why>a project-wide NoWarn outside the allowlist</Why>
+      </_Probe>
+      <_Probe Include="StrictWarnings">
+        <VerifyTarget>B44VerifyWarningPolicy</VerifyTarget>
+        <Why>this repository's own conforming warning settings</Why>
+      </_Probe>
+    </ItemGroup>
+
+    <!-- Batched over @(_Probe): one Exec per probe. Forward slashes because an
+         Exec command line is a raw shell string that MSBuild does not
+         normalize, and CI runs on Linux, where a backslash is not a separator. -->
+    <Exec Command="dotnet msbuild &quot;$(MSBuildProjectDirectory)/probes/%(_Probe.Identity)/%(_Probe.Identity).csproj&quot; -t:%(_Probe.VerifyTarget) -nologo -v:q -nodeReuse:false"
+          IgnoreExitCode="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low"
+          ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ExitCode" ItemName="_ProbeResult" />
+    </Exec>
+
+    <!-- Exec batching yields one _ProbeResult per probe, in item order. -->
+    <PropertyGroup>
+      <_ProbeResults>@(_ProbeResult, ',')</_ProbeResults>
+      <_ExpectedResults>1,1,0,1,1,1,1,0</_ExpectedResults>
+    </PropertyGroup>
+    <Error Condition="'$(_ProbeResults)' != '$(_ExpectedResults)'"
+           Text="Project-policy probe outcomes were '$(_ProbeResults)', expected '$(_ExpectedResults)' (0 = target passed, 1 = target failed) for: @(_Probe->'%(Identity) [%(Why)]', '; '). A guard either stopped firing on a violation or started rejecting a conforming project." />
+  </Target>
+
+  <!-- ── Engine boundary ─────────────────────────────────────────────────── -->
+  <Target Name="VerifyEngineBoundaryFixture" BeforeTargets="Build">
+    <ItemGroup>
+      <_CleanReference Include="C:\refs\System.Runtime.dll" />
+      <_CleanReference Include="C:\refs\B44.Common.dll" />
+      <_CleanReference Include="C:\refs\MyGame.Core.dll" />
+      <!-- Not Unity: the prefix test is "Unity." with the dot, so a package
+           whose name merely begins with the word must not trip it. -->
+      <_CleanReference Include="C:\refs\UnityLikeHelpers.dll" />
+    </ItemGroup>
+    <B44EngineBoundaryTask ProjectName="Fixture.Core" References="@(_CleanReference)"
+                           FailOnViolation="false">
+      <Output TaskParameter="ViolationCount" PropertyName="_CleanEngineViolations" />
+    </B44EngineBoundaryTask>
+    <Error Condition="'$(_CleanEngineViolations)' != '0'"
+           Text="An engine-free reference set was reported as violating; got '$(_CleanEngineViolations)'." />
+
+    <!-- Each engine assembly family, one at a time. GodotPlugins, Unity.* and
+         the analyzer case are the ones a filename check for GodotSharp /
+         UnityEngine / UnityEditor alone would have missed. -->
+    <ItemGroup>
+      <_EngineReference Include="C:\refs\GodotSharp.dll" />
+      <_EngineReference Include="C:\refs\GodotSharpEditor.dll" />
+      <_EngineReference Include="C:\refs\GodotPlugins.dll" />
+      <_EngineReference Include="C:\refs\UnityEngine.CoreModule.dll" />
+      <_EngineReference Include="C:\refs\UnityEditor.dll" />
+      <_EngineReference Include="C:\refs\Unity.Mathematics.dll" />
+      <_EngineReference Include="C:\refs\System.Runtime.dll" />
+    </ItemGroup>
+    <B44EngineBoundaryTask ProjectName="Fixture.Core" References="@(_EngineReference)"
+                           FailOnViolation="false">
+      <Output TaskParameter="ViolationCount" PropertyName="_EngineViolations" />
+    </B44EngineBoundaryTask>
+    <Error Condition="'$(_EngineViolations)' != '6'"
+           Text="Expected 6 engine reference violations (Godot x3, Unity x3); got '$(_EngineViolations)'. An engine assembly family is no longer detected." />
+
+    <!-- An engine source generator never appears in @(ReferencePath). -->
+    <ItemGroup>
+      <_EngineAnalyzer Include="C:\refs\Godot.SourceGenerators.dll" />
+      <_EngineAnalyzer Include="C:\refs\Microsoft.CodeAnalysis.BannedApiAnalyzers.dll" />
+    </ItemGroup>
+    <B44EngineBoundaryTask ProjectName="Fixture.Core" Analyzers="@(_EngineAnalyzer)"
+                           FailOnViolation="false">
+      <Output TaskParameter="ViolationCount" PropertyName="_AnalyzerViolations" />
+    </B44EngineBoundaryTask>
+    <Error Condition="'$(_AnalyzerViolations)' != '1'"
+           Text="An engine source generator supplied as an analyzer was not detected; got '$(_AnalyzerViolations)' violation(s)." />
+
+    <!-- The escape hatch, for the non-engine package that collides with the
+         Unity prefix (the Unity IoC container is the real-world case). -->
+    <ItemGroup>
+      <_CollidingReference Include="C:\refs\Unity.Container.dll" />
+      <_CollidingAllow Include="Unity.Container" />
+    </ItemGroup>
+    <B44EngineBoundaryTask ProjectName="Fixture.Core" References="@(_CollidingReference)"
+                           AllowedNames="@(_CollidingAllow)" FailOnViolation="false">
+      <Output TaskParameter="ViolationCount" PropertyName="_AllowedViolations" />
+    </B44EngineBoundaryTask>
+    <Error Condition="'$(_AllowedViolations)' != '0'"
+           Text="B44EngineReferenceAllow did not exempt an explicitly allowed assembly; got '$(_AllowedViolations)' violation(s)." />
+
+    <!-- The gate: detection alone is not enforcement. -->
+    <B44EngineBoundaryTask ProjectName="Fixture.Core" References="@(_EngineReference)"
+                           FailOnViolation="true" ContinueOnError="true" />
+    <Error Condition="'$(MSBuildLastTaskResult)' == 'true'"
+           Text="An engine reference did not fail the engine-free boundary task." />
+  </Target>
+
+  <!-- ── Repository hygiene ──────────────────────────────────────────────── -->
+  <Target Name="VerifyRepositoryHygieneFixture" BeforeTargets="Build">
+    <ItemGroup>
+      <!-- Files that MUST stay clean. The .uid entry is the important one:
+           organization guidance requires committing every Godot .uid sidecar,
+           so a hygiene rule that flags them would be actively harmful. The
+           .obj entry is a Wavefront model, not a build directory, and
+           Packages/manifest.json is Unity's tracked package manifest. -->
+      <_CleanTrackedFile Include="src/Game.cs" />
+      <_CleanTrackedFile Include="Scenes/Player.tscn" />
+      <_CleanTrackedFile Include="Scenes/Player.cs.uid" />
+      <_CleanTrackedFile Include="Scenes/Player.tscn.import" />
+      <_CleanTrackedFile Include="Packages/manifest.json" />
+      <_CleanTrackedFile Include="Art/model.obj" />
+      <_CleanTrackedFile Include="README.md" />
+      <_CleanTrackedFile Include="binaries/README.md" />
+    </ItemGroup>
+    <B44RepositoryHygieneTask TrackedFiles="@(_CleanTrackedFile)" CheckBinaries="true"
+                              FailOnViolation="false">
+      <Output TaskParameter="ViolationCount" PropertyName="_CleanHygieneViolations" />
+    </B44RepositoryHygieneTask>
+    <Error Condition="'$(_CleanHygieneViolations)' != '0'"
+           Text="A clean tracked-file set reported $(_CleanHygieneViolations) hygiene violation(s). Committed Godot .uid sidecars, Wavefront .obj models and Unity package manifests must never be flagged." />
+
+    <ItemGroup>
+      <_DirtyTrackedFile Include="bin/Debug/net8.0/App.dll" />
+      <_DirtyTrackedFile Include="src/obj/Generated.g.cs" />
+      <_DirtyTrackedFile Include="TestResults/run.trx" />
+      <_DirtyTrackedFile Include=".vs/slnx.sqlite" />
+      <_DirtyTrackedFile Include=".godot/uid_cache.bin" />
+      <_DirtyTrackedFile Include="dist/site/index.html" />
+      <_DirtyTrackedFile Include="diag.log" />
+      <_DirtyTrackedFile Include="src/Game.cs.bak" />
+      <_DirtyTrackedFile Include="src/Game.cs.orig" />
+      <_DirtyTrackedFile Include="src/Game.cs.rej" />
+      <_DirtyTrackedFile Include="src/App.csproj.user" />
+      <_DirtyTrackedFile Include="Thumbs.db" />
+      <_DirtyTrackedFile Include="~$Design.docx" />
+      <_DirtyTrackedFile Include="docs/Screenshot 2026-08-01.png" />
+      <_DirtyTrackedFile Include="tools/helper.exe" />
+      <!-- Clean entries mixed in: a rule that flags everything proves nothing. -->
+      <_DirtyTrackedFile Include="src/Game.cs" />
+      <_DirtyTrackedFile Include="Scenes/Player.cs.uid" />
+    </ItemGroup>
+    <B44RepositoryHygieneTask TrackedFiles="@(_DirtyTrackedFile)" CheckBinaries="true"
+                              FailOnViolation="false">
+      <Output TaskParameter="ViolationCount" PropertyName="_DirtyHygieneViolations" />
+    </B44RepositoryHygieneTask>
+    <Error Condition="'$(_DirtyHygieneViolations)' != '15'"
+           Text="Expected 15 hygiene violations across the debris classes; got '$(_DirtyHygieneViolations)'. A debris class is no longer detected, or a clean file was flagged." />
+
+    <!-- Repositories that commit native plugins on purpose turn the binary
+         family off wholesale, or exempt exact paths. -->
+    <ItemGroup>
+      <_BinaryTrackedFile Include="tools/helper.exe" />
+      <_BinaryTrackedFile Include="native/libfoo.so" />
+      <_BinaryTrackedFile Include="src/Game.cs" />
+    </ItemGroup>
+    <B44RepositoryHygieneTask TrackedFiles="@(_BinaryTrackedFile)" CheckBinaries="false"
+                              FailOnViolation="false">
+      <Output TaskParameter="ViolationCount" PropertyName="_BinariesOffViolations" />
+    </B44RepositoryHygieneTask>
+    <Error Condition="'$(_BinariesOffViolations)' != '0'"
+           Text="B44HygieneBinaries=false did not disable the binary/archive family; got '$(_BinariesOffViolations)' violation(s)." />
+
+    <B44RepositoryHygieneTask TrackedFiles="@(_BinaryTrackedFile)" AllowedPatterns="tools/*.exe;native/libfoo.so"
+                              CheckBinaries="true" FailOnViolation="false">
+      <Output TaskParameter="ViolationCount" PropertyName="_AllowedHygieneViolations" />
+    </B44RepositoryHygieneTask>
+    <Error Condition="'$(_AllowedHygieneViolations)' != '0'"
+           Text="B44HygieneAllow did not exempt allowed paths (glob and exact); got '$(_AllowedHygieneViolations)' violation(s)." />
+
+    <!-- The gate. -->
+    <B44RepositoryHygieneTask TrackedFiles="@(_DirtyTrackedFile)" CheckBinaries="true"
+                              FailOnViolation="true" ContinueOnError="true" />
+    <Error Condition="'$(MSBuildLastTaskResult)' == 'true'"
+           Text="Committed build output did not fail the repository hygiene task." />
+  </Target>
+
+  <!-- ── Suppression budget ──────────────────────────────────────────────── -->
+  <Target Name="PrepareSuppressionFixture" BeforeTargets="VerifySuppressionBudgetFixture">
+    <MakeDir Directories="$(_FixtureRoot);$(_FixtureRoot)Core;$(_FixtureRoot)Core\obj;$(_FixtureRoot)Fixture.Tests" />
+    <WriteLinesToFile File="$(_FixtureRoot)Core\A.cs" Overwrite="true"
+                      Lines="#pragma warning disable CA1031;var x = 1;#pragma warning disable CA1062" />
+    <WriteLinesToFile File="$(_FixtureRoot)Core\B.cs" Overwrite="true"
+                      Lines="[SuppressMessage(&quot;Design&quot;, &quot;CA1000&quot;, Justification = &quot;fixture&quot;)];public sealed class B { }" />
+    <WriteLinesToFile File="$(_FixtureRoot)Core\Clean.cs" Overwrite="true"
+                      Lines="public sealed class Clean { }" />
+    <!-- Out of scope: an excluded top-level directory and a generated obj
+         subtree. Both are noisy on purpose, so a scan that reaches either
+         shows up as a wrong count instead of a silent pass. -->
+    <WriteLinesToFile File="$(_FixtureRoot)Fixture.Tests\Noisy.cs" Overwrite="true"
+                      Lines="#pragma warning disable CA1031;#pragma warning disable CA1062;#pragma warning disable CA1303;#pragma warning disable CA2000" />
+    <WriteLinesToFile File="$(_FixtureRoot)Core\obj\Generated.cs" Overwrite="true"
+                      Lines="#pragma warning disable CS8618;#pragma warning disable CS8625" />
+  </Target>
+
+  <Target Name="VerifySuppressionBudgetFixture" BeforeTargets="Build">
+    <ItemGroup>
+      <_FixtureExclude Include="Fixture.Tests" />
+    </ItemGroup>
+
+    <!-- Three in-scope suppressions: two pragmas in A.cs, one attribute in
+         B.cs. Anything else means the exclude list or the obj skip broke. -->
+    <B44SuppressionBudgetTask RepositoryRoot="$(_FixtureRoot)" ExcludedDirectories="@(_FixtureExclude)"
+                              Budget="3" FailOnViolation="false">
+      <Output TaskParameter="SuppressionCount" PropertyName="_SuppressionCount" />
+    </B44SuppressionBudgetTask>
+    <Error Condition="'$(_SuppressionCount)' != '3'"
+           Text="Expected 3 in-scope suppressions; counted '$(_SuppressionCount)'. An excluded directory or an obj subtree was scanned." />
+
+    <!-- Under budget is a warning, never an error: deleting code must not fail
+         a build. The count is still reported honestly. -->
+    <B44SuppressionBudgetTask RepositoryRoot="$(_FixtureRoot)" ExcludedDirectories="@(_FixtureExclude)"
+                              Budget="4" FailOnViolation="true" ContinueOnError="true" />
+    <Error Condition="'$(MSBuildLastTaskResult)' != 'true'"
+           Text="Being UNDER the suppression budget failed the build. Removing a suppression must never be an error." />
+
+    <!-- The gate. -->
+    <B44SuppressionBudgetTask RepositoryRoot="$(_FixtureRoot)" ExcludedDirectories="@(_FixtureExclude)"
+                              Budget="2" FailOnViolation="true" ContinueOnError="true" />
+    <Error Condition="'$(MSBuildLastTaskResult)' == 'true'"
+           Text="Exceeding the suppression budget did not fail the task." />
+  </Target>
+</Project>

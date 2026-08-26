@@ -1,0 +1,336 @@
+<Project>
+  <!-- Repository-wide hygiene checks. Both run once per build from a single
+       anchor project, exactly like the source-size ratchet, and both default
+       their anchor and root to the ratchet's so a consumer enabling them adds
+       one line rather than four:
+
+         <B44HygieneEnabled>true</B44HygieneEnabled>
+         <B44SuppressionBudget>0</B44SuppressionBudget>
+
+       Optional overrides: B44HygieneProject, B44HygieneRepositoryRoot,
+       B44HygieneAllow (semicolon-separated), B44HygieneBinaries, B44SuppressionExclude. -->
+  <PropertyGroup>
+    <B44HygieneProject Condition="'$(B44HygieneProject)' == ''">$(B44RatchetProject)</B44HygieneProject>
+    <B44HygieneRepositoryRoot Condition="'$(B44HygieneRepositoryRoot)' == ''">$(B44RatchetRepositoryRoot)</B44HygieneRepositoryRoot>
+    <B44HygieneProjectFullPath Condition="'$(B44HygieneProject)' != ''">$([MSBuild]::NormalizePath('$(B44HygieneProject)'))</B44HygieneProjectFullPath>
+    <B44HygieneBinaries Condition="'$(B44HygieneBinaries)' == ''">true</B44HygieneBinaries>
+  </PropertyGroup>
+
+  <UsingTask
+    TaskName="B44RepositoryHygieneTask"
+    TaskFactory="RoslynCodeTaskFactory"
+    AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <!-- Repository-relative paths of TRACKED files, supplied by git. The
+           question is only ever "is this committed", so the filesystem is the
+           wrong authority: bin/ and obj/ exist in every working tree and are
+           correctly ignored there. Taking the list as a parameter also lets
+           the fixture exercise every rule without a git repository. -->
+      <TrackedFiles ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
+      <!-- Semicolon-separated repository-relative paths or globs ('*' matches
+           any run of characters) that are committed on purpose. A STRING and
+           not an item list on purpose: MSBuild expands a wildcard in an item
+           Include against the filesystem, so `tools/*.exe` written as an item
+           would silently become an empty exemption whenever nothing matched. -->
+      <AllowedPatterns ParameterType="System.String" Required="false" />
+      <CheckBinaries ParameterType="System.Boolean" Required="true" />
+      <FailOnViolation ParameterType="System.Boolean" Required="true" />
+      <ViolationCount ParameterType="System.Int32" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+        // Generated build output, engine and tool caches. "packages" is
+        // deliberately absent: Unity's Packages/manifest.json is a tracked
+        // source file. So is every *.uid Godot writes beside a script, and no
+        // rule below matches one — committing them is required, not debris.
+        var directories = new System.Collections.Generic.HashSet<string>(
+            new[]
+            {
+                "bin", "obj", "TestResults", "node_modules", ".vs", ".idea",
+                ".godot", "coverage", "dist", "publish", "artifacts"
+            },
+            System.StringComparer.OrdinalIgnoreCase);
+
+        // ".obj" is deliberately absent: it is also a Wavefront 3D model.
+        var extensions = new System.Collections.Generic.HashSet<string>(
+            new[]
+            {
+                ".bak", ".orig", ".rej", ".tmp", ".temp", ".swp", ".swo",
+                ".log", ".suo", ".user", ".pdb", ".nupkg", ".snupkg", ".trx",
+                ".coverage", ".dmp", ".mdb", ".ilk", ".cache", ".stackdump"
+            },
+            System.StringComparer.OrdinalIgnoreCase);
+
+        var binaryExtensions = new System.Collections.Generic.HashSet<string>(
+            new[] { ".dll", ".exe", ".so", ".dylib", ".zip", ".7z", ".rar", ".tar", ".gz", ".tgz", ".msi", ".jar" },
+            System.StringComparer.OrdinalIgnoreCase);
+
+        var names = new System.Collections.Generic.HashSet<string>(
+            new[] { "thumbs.db", ".ds_store", "desktop.ini" },
+            System.StringComparer.OrdinalIgnoreCase);
+
+        var patterns = new System.Collections.Generic.List<System.Text.RegularExpressions.Regex>();
+        foreach (var entry in (AllowedPatterns ?? string.Empty).Split(';'))
+        {
+            var pattern = entry.Trim().Replace('\\', '/');
+            if (pattern.Length == 0) continue;
+
+            var expression = "^" + System.Text.RegularExpressions.Regex.Escape(pattern).Replace("\\*", ".*") + "$";
+            patterns.Add(new System.Text.RegularExpressions.Regex(
+                expression, System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+        }
+
+        var violations = new System.Collections.Generic.List<string>();
+        foreach (var item in TrackedFiles ?? System.Array.Empty<Microsoft.Build.Framework.ITaskItem>())
+        {
+            var path = (item.ItemSpec ?? string.Empty).Trim().Replace('\\', '/');
+            if (path.Length == 0) continue;
+            if (patterns.Exists(candidate => candidate.IsMatch(path))) continue;
+
+            var segments = path.Split('/');
+            var fileName = segments[segments.Length - 1];
+            var extension = System.IO.Path.GetExtension(fileName);
+            string reason = null;
+
+            for (var i = 0; reason == null && i < segments.Length - 1; i++)
+            {
+                if (directories.Contains(segments[i]))
+                {
+                    reason = "lives in a generated directory (" + segments[i] + "/)";
+                }
+            }
+
+            if (reason == null && names.Contains(fileName))
+            {
+                reason = "is an operating-system metadata file";
+            }
+            else if (reason == null && fileName.StartsWith("~$", System.StringComparison.Ordinal))
+            {
+                reason = "is an editor lock file";
+            }
+            else if (reason == null &&
+                     (fileName.StartsWith("screenshot", System.StringComparison.OrdinalIgnoreCase) ||
+                      fileName.StartsWith("screen shot", System.StringComparison.OrdinalIgnoreCase) ||
+                      fileName.StartsWith("screen_shot", System.StringComparison.OrdinalIgnoreCase)))
+            {
+                reason = "looks like an ad-hoc screenshot";
+            }
+            else if (reason == null && extensions.Contains(extension))
+            {
+                reason = "is a log, temp, backup, merge-conflict or tooling artifact (" + extension + ")";
+            }
+            else if (reason == null && CheckBinaries && binaryExtensions.Contains(extension))
+            {
+                reason = "is a binary or archive (" + extension + ") committed to source";
+            }
+
+            if (reason != null) violations.Add(path + " — " + reason);
+        }
+
+        void Report(string message)
+        {
+            if (FailOnViolation) Log.LogError(null, "B44H002", null, null, 0, 0, 0, 0, message);
+            else Log.LogMessage(Microsoft.Build.Framework.MessageImportance.High, message);
+        }
+
+        // Cap the listing. Enabling this on a repository that has been
+        // collecting debris for a year should produce a readable verdict, not
+        // a thousand-line log nobody scrolls through.
+        var listed = 0;
+        foreach (var violation in violations)
+        {
+            if (listed++ == 25)
+            {
+                Report("B44 hygiene: ... and " + (violations.Count - 25) + " more.");
+                break;
+            }
+            Report("B44 hygiene: tracked file " + violation + ".");
+        }
+
+        if (violations.Count > 0)
+        {
+            Report("B44 hygiene: " + violations.Count + " committed file(s) look like build output, logs, or " +
+                "editor debris. Remove them with `git rm --cached`, and add the pattern to .gitignore so the " +
+                "next one never lands. If a file is committed on purpose, list it in B44HygieneAllow with a " +
+                "comment saying why.");
+        }
+
+        ViolationCount = violations.Count;
+
+        // Fail explicitly rather than relying on the logged errors. A caller
+        // that downgrades errors with ContinueOnError turns them into warnings
+        // before the task result is computed, and the gate would report
+        // success; returning false survives that downgrade.
+        if (FailOnViolation && violations.Count > 0)
+        {
+            return false;
+        }
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="B44VerifyRepositoryHygiene"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(B44HygieneEnabled)' == 'true' and '$(B44HygieneProjectFullPath)' == '$(MSBuildProjectFullPath)'">
+    <Error Condition="'$(B44HygieneRepositoryRoot)' == ''"
+           Text="B44HygieneEnabled requires B44HygieneRepositoryRoot (it defaults to B44RatchetRepositoryRoot). Set it to $(MSBuildThisFileDirectory) from the repository's Directory.Build.props." />
+
+    <!-- core.quotePath=false keeps non-ASCII paths readable instead of
+         octal-escaped. IgnoreExitCode plus an explicit check, because a
+         hygiene check that silently passes when git is unavailable is worse
+         than no hygiene check. -->
+    <Exec Command="git -c core.quotePath=false ls-files"
+          WorkingDirectory="$(B44HygieneRepositoryRoot)"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low"
+          IgnoreExitCode="true"
+          ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ConsoleOutput" ItemName="_B44TrackedFile" />
+      <Output TaskParameter="ExitCode" PropertyName="_B44GitExitCode" />
+    </Exec>
+
+    <Warning Condition="'$(_B44GitExitCode)' != '0'"
+             Code="B44H001"
+             Text="B44 hygiene: skipped, because `git ls-files` failed (exit '$(_B44GitExitCode)') in $(B44HygieneRepositoryRoot). The check needs a git working tree and git on PATH; nothing was verified." />
+
+    <B44RepositoryHygieneTask
+      Condition="'$(_B44GitExitCode)' == '0'"
+      TrackedFiles="@(_B44TrackedFile)"
+      AllowedPatterns="$(B44HygieneAllow)"
+      CheckBinaries="$(B44HygieneBinaries)"
+      FailOnViolation="true" />
+  </Target>
+
+  <UsingTask
+    TaskName="B44SuppressionBudgetTask"
+    TaskFactory="RoslynCodeTaskFactory"
+    AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <RepositoryRoot ParameterType="System.String" Required="true" />
+      <ExcludedDirectories ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
+      <Budget ParameterType="System.Int32" Required="true" />
+      <FailOnViolation ParameterType="System.Boolean" Required="true" />
+      <SuppressionCount ParameterType="System.Int32" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+        string GetRelativePath(string relativeTo, string path)
+        {
+            var baseUri = new System.Uri(
+                relativeTo.EndsWith(System.IO.Path.DirectorySeparatorChar.ToString(), System.StringComparison.Ordinal)
+                    ? relativeTo
+                    : relativeTo + System.IO.Path.DirectorySeparatorChar);
+            var target = new System.Uri(path);
+            return System.Uri.UnescapeDataString(baseUri.MakeRelativeUri(target).ToString())
+                .Replace('/', System.IO.Path.DirectorySeparatorChar);
+        }
+
+        int CountOccurrences(string text, string value)
+        {
+            var count = 0;
+            var index = 0;
+            while ((index = text.IndexOf(value, index, System.StringComparison.Ordinal)) >= 0)
+            {
+                count++;
+                index += value.Length;
+            }
+            return count;
+        }
+
+        try
+        {
+            var root = System.IO.Path.GetFullPath(RepositoryRoot);
+            if (!System.IO.Directory.Exists(root))
+            {
+                Log.LogError("B44SuppressionBudget: repository root does not exist: " + root);
+            }
+            else
+            {
+            var excluded = new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
+            foreach (var item in ExcludedDirectories ?? System.Array.Empty<Microsoft.Build.Framework.ITaskItem>())
+            {
+                var name = (item.ItemSpec ?? string.Empty).Trim();
+                if (name.Length > 0) excluded.Add(name.Replace('\\', '/').TrimEnd('/'));
+            }
+
+            // Same production-source scope as the size ratchet, and the same
+            // exclude list, so "production code" means one thing per repository.
+            var total = 0;
+            var perFile = new System.Collections.Generic.List<string>();
+            foreach (var file in System.IO.Directory.EnumerateFiles(root, "*.cs", System.IO.SearchOption.AllDirectories))
+            {
+                var relative = GetRelativePath(root, file).Replace('\\', '/');
+                var parts = relative.Split('/');
+                var skip = excluded.Contains(parts[0]);
+                for (var i = 0; !skip && i < parts.Length; i++)
+                {
+                    if (parts[i] == "bin" || parts[i] == "obj") skip = true;
+                }
+                if (skip) continue;
+
+                var text = System.IO.File.ReadAllText(file);
+                var count = CountOccurrences(text, "#pragma warning disable") + CountOccurrences(text, "SuppressMessage");
+                if (count == 0) continue;
+
+                total += count;
+                perFile.Add(relative + " (" + count + ")");
+            }
+
+            perFile.Sort(System.StringComparer.Ordinal);
+            SuppressionCount = total;
+
+            if (total > Budget)
+            {
+                var message = "B44 suppression budget: " + total + " analyzer suppression(s) in production sources, " +
+                    "over the budget of " + Budget + ". Suppressing a diagnostic is a decision, not a fix: address it, " +
+                    "or raise B44SuppressionBudget in Directory.Build.props in the same change so the new suppression " +
+                    "is visible in review. Current: " + string.Join(", ", perFile.ToArray());
+                if (FailOnViolation)
+                {
+                    // Returned explicitly so the gate survives a caller that
+                    // downgrades errors with ContinueOnError.
+                    Log.LogError(null, "B44S002", null, null, 0, 0, 0, 0, message);
+                    return false;
+                }
+
+                Log.LogMessage(Microsoft.Build.Framework.MessageImportance.High, message);
+            }
+            else if (total < Budget)
+            {
+                // A warning, not an error: deleting code should never fail a
+                // build, but a budget nobody lowers quietly stops being a limit.
+                Log.LogWarning(
+                    null, "B44S001", null, null, 0, 0, 0, 0,
+                    "B44 suppression budget: only " + total + " suppression(s) remain against a budget of " + Budget +
+                    ". Lower B44SuppressionBudget to " + total + " to keep the ratchet tight.");
+            }
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Log.LogErrorFromException(ex, true);
+        }
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="B44VerifySuppressionBudget"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(B44SuppressionBudget)' != '' and '$(B44HygieneProjectFullPath)' == '$(MSBuildProjectFullPath)'">
+    <Error Condition="'$(B44HygieneRepositoryRoot)' == ''"
+           Text="B44SuppressionBudget requires B44HygieneRepositoryRoot (it defaults to B44RatchetRepositoryRoot)." />
+    <ItemGroup>
+      <_B44SuppressionExclude Include="@(B44SuppressionExclude)" />
+      <_B44SuppressionExclude Include="@(B44RatchetExclude)" Condition="'@(B44SuppressionExclude)' == ''" />
+    </ItemGroup>
+    <B44SuppressionBudgetTask
+      RepositoryRoot="$(B44HygieneRepositoryRoot)"
+      ExcludedDirectories="@(_B44SuppressionExclude)"
+      Budget="$(B44SuppressionBudget)"
+      FailOnViolation="true" />
+  </Target>
+</Project>

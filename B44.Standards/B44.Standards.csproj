@@ -7,7 +7,7 @@
          from tripping netstandard2.0's C# 7.3 default. -->
     <LangVersion>latest</LangVersion>
     <PackageId>B44.Standards</PackageId>
-    <Version>0.11.0</Version>
+    <Version>0.12.0</Version>
     <Authors>DA-Sandman-Jr</Authors>
     <Company>B44 Labs</Company>
     <Description>B44 studio policy as a package: analyzers, severity globalconfig, code metrics, engine-free-core enforcement, and opt-in synchronized agent guidance. Reference with PrivateAssets=all.</Description>
@@ -22,6 +22,7 @@
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <DevelopmentDependency>true</DevelopmentDependency>
     <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <B44AllowedNoWarn>$(B44AllowedNoWarn);NU5128</B44AllowedNoWarn>
   </PropertyGroup>
 
   <ItemGroup>

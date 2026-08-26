@@ -9,53 +9,22 @@
     <AnalysisLevelSecurity Condition="'$(AnalysisLevelSecurity)' == ''">$(B44SecurityAnalysisLevel)</AnalysisLevelSecurity>
   </PropertyGroup>
 
-  <!-- Layered enforcement, opt-in per project:
-         <B44EngineFreeCore>true</B44EngineFreeCore>  — engine-free Core of a
-             game or shared package: bans Godot and Unity APIs at the symbol
-             level, fails the build if a Godot or Unity assembly appears in the
-             resolved reference graph (a symbol analyzer can't reject an unused
-             dependency), and implies determinism enforcement below.
-             Deliberately a flat list of the engines B44 actually integrates,
-             not an extensible engine-policy mechanism.
-         <B44Deterministic>true</B44Deterministic>    — any B44 project that
-             wants ambient time/randomness banned (injected TimeProvider /
-             explicit random source). Games' Cores get it via the flag above;
-             non-game repos can opt in directly.
-         <B44SecuritySensitive>true</B44SecuritySensitive> — public/network
-             code: enables every built-in SDK Security rule at a target-level
-             pin (net8.0 => 8.0-all, net10.0 => 10.0-all). -->
-  <PropertyGroup>
-    <B44Deterministic Condition="'$(B44Deterministic)' == '' and '$(B44EngineFreeCore)' == 'true'">true</B44Deterministic>
-  </PropertyGroup>
+  <!-- Layered enforcement, opt-in per project. The boundary layer (engine-free
+       and deterministic authority) lives in B44.Boundaries.targets; the
+       per-project verification-integrity checks live in
+       B44.ProjectPolicy.targets; the repository-wide hygiene and suppression
+       ratchets live in B44.RepositoryHygiene.targets. Each is imported below
+       and documents its own opt-in properties.
 
-  <ItemGroup Condition="'$(B44Deterministic)' == 'true'">
-    <AdditionalFiles Include="$(MSBuildThisFileDirectory)../config/BannedSymbols.Determinism.txt" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(B44EngineFreeCore)' == 'true'">
-    <AdditionalFiles Include="$(MSBuildThisFileDirectory)../config/BannedSymbols.Godot.txt" />
-    <AdditionalFiles Include="$(MSBuildThisFileDirectory)../config/BannedSymbols.Unity.txt" />
-  </ItemGroup>
-
-  <Target Name="B44EnforceEngineFreeCore"
-          AfterTargets="ResolveAssemblyReferences"
-          Condition="'$(B44EngineFreeCore)' == 'true'">
-    <ItemGroup>
-      <B44GodotReference Include="@(ReferencePath)"
-                         Condition="$([System.String]::new('%(FileName)').StartsWith('GodotSharp'))" />
-      <!-- Unity's managed assemblies are UnityEngine*.dll and UnityEditor*.dll,
-           whichever way they arrived: a package, a reference assembly, or a DLL
-           copied into the project. The symbol ban above cannot reject a
-           dependency nothing has used yet, which is the whole reason this
-           second check exists. -->
-      <B44UnityReference Include="@(ReferencePath)"
-                         Condition="$([System.String]::new('%(FileName)').StartsWith('UnityEngine')) or $([System.String]::new('%(FileName)').StartsWith('UnityEditor'))" />
-    </ItemGroup>
-    <Error Condition="'@(B44GodotReference)' != ''"
-           Text="$(MSBuildProjectName) is an engine-free Core project but resolves a Godot reference (%(B44GodotReference.FileName)). Remove the Godot dependency; Core must build and test without the engine. Godot-facing code belongs in the presentation project." />
-    <Error Condition="'@(B44UnityReference)' != ''"
-           Text="$(MSBuildProjectName) is an engine-free Core project but resolves a Unity reference (%(B44UnityReference.FileName)). Remove the Unity dependency; Core must build and test without an engine. Unity-facing code belongs in the B44.Unity integration package." />
-  </Target>
+         <B44EngineFreeCore>true</B44EngineFreeCore>       engine-free Core
+         <B44EngineFree>true</B44EngineFree>               engine-free project
+         <B44Deterministic>true</B44Deterministic>         no ambient time/RNG
+         <B44SecuritySensitive>true</B44SecuritySensitive> public/network code:
+             enables every built-in SDK Security rule at a target-level pin
+             (net8.0 => 8.0-all, net10.0 => 10.0-all). -->
+  <Import Project="$(MSBuildThisFileDirectory)B44.Boundaries.targets" />
+  <Import Project="$(MSBuildThisFileDirectory)B44.ProjectPolicy.targets" />
+  <Import Project="$(MSBuildThisFileDirectory)B44.RepositoryHygiene.targets" />
 
   <!-- Agent guidance is deliberately opt-in. B44.Standards can therefore be
        used outside B44-owned repositories without rewriting a consumer's

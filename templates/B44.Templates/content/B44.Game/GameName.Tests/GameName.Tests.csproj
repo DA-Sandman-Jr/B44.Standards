@@ -4,8 +4,14 @@
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <!-- Required on current SDKs: without this, `dotnet test` restores and
-         exits without running any xunit.v3 tests. -->
+         exits without running any xunit.v3 tests. B44.Standards fails the
+         build if it goes missing, because that failure is otherwise green. -->
     <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <!-- The suite covers Core and must run on a machine with no engine
+         installed. B44.Standards bans Godot and Unity symbols here and fails
+         the build if an engine assembly reaches the reference graph — which a
+         symbol analyzer cannot do for a dependency nothing has used yet. -->
+    <B44EngineFree>true</B44EngineFree>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,17 +26,9 @@
     <ProjectReference Include="..\GameName.Core\GameName.Core.csproj" />
   </ItemGroup>
 
-  <!-- Mechanical proof that the suite stays engine-independent. A symbol
-       analyzer cannot reject an unused dependency, so the reference graph is
-       checked directly. -->
-  <Target Name="PreventGodotDependencies" BeforeTargets="ResolveReferences">
-    <Error Condition="'@(ProjectReference->WithMetadataValue('Filename','GameName'))' != ''"
-           Text="GameName.Tests must remain core-only. Do not reference GameName.csproj; move testable logic into GameName.Core instead." />
-    <Error Condition="'@(PackageReference->WithMetadataValue('Identity','Godot.NET.Sdk'))' != ''"
-           Text="GameName.Tests must not reference Godot packages." />
-    <Error Condition="'@(PackageReference->WithMetadataValue('Identity','GodotSharp'))' != ''"
-           Text="GameName.Tests must not reference Godot packages." />
-    <Error Condition="'@(Reference->WithMetadataValue('Identity','GodotSharp'))' != ''"
-           Text="GameName.Tests must not reference Godot assemblies." />
-  </Target>
+  <!-- The engine guard that used to live here as a hand-written target is now
+       B44EngineFree above. Do not paste a local copy back: shared behaviour is
+       fixed in the B44 package that owns it, and the packaged check covers the
+       families a filename list here kept missing (GodotPlugins, Unity package
+       modules, engine source generators). -->
 </Project>

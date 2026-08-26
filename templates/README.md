@@ -8,17 +8,22 @@ dotnet new b44game -n MyGame
 ```
 
 That produces a repository that builds, tests, and passes its own gates
-immediately: engine-free Core with `B44EngineFreeCore=true`, an xunit.v3 test
-project carrying the Godot guard, `B44.Standards` policy, agent-guidance
-synchronization, the source-size ratchet, a `BACKLOG.md`, and CI wired to the
-shared reusable workflow. A placeholder type and test exist only to prove the
-wiring — delete them with your first real commit.
+immediately: engine-free Core with `B44EngineFreeCore=true`, an equally
+engine-free xunit.v3 test project (`B44EngineFree=true`), `B44.Standards`
+policy, agent-guidance synchronization, the source-size ratchet, repository
+hygiene, a zero suppression budget, warnings-as-errors, a `BACKLOG.md`, and CI
+wired to the shared reusable workflow. A placeholder type and test exist only
+to prove the wiring — delete them with your first real commit.
+
+The template parameter defaults and the `B44.Standards` version publish from
+the same `v*` tag, so a scaffolded repository always gets a `B44.Standards`
+float that actually carries the guardrails its `Directory.Build.props` enables.
 
 Parameters (`dotnet new b44game --help` lists them):
 
 | Parameter | Default | Purpose |
 |---|---|---|
-| `--standardsVersion` | `0.11.*` | Compatibility-bounded float for `B44.Standards` |
+| `--standardsVersion` | `0.12.*` | Compatibility-bounded float for `B44.Standards` |
 | `--commonVersion` | `0.11.*` | Compatibility-bounded float for `B44.Common` |
 | `--targetFramework` | `net8.0` | Core and test target framework |
 | `--ciRef` | `9c6faefab05253a4fa1d16b971d37cc8c80bf750` | Reviewed commit for the shared reusable CI workflow |
@@ -46,4 +51,4 @@ existing repo that predates it.
 | `build-test.yml` | `.github/workflows/` | Build + test gate; replace `GAME` placeholders; B44 packages restore directly from nuget.org |
 | `nuget.config` | repo root | Optional deterministic nuget.org-only package source; no credentials |
 | `CLAUDE.skeleton.md` | new root `CLAUDE.md` | Repository-local starter only; B44.Standards inserts and maintains the canonical managed sections |
-| `TestProject.godot-guard.snippet.xml` | test csproj | MSBuild error if a Godot reference sneaks into the test/Core chain |
+| `TestProject.godot-guard.snippet.xml` | test csproj | One property (`B44EngineFree`) that hands the engine guard to B44.Standards 0.12.0+; delete any pasted `PreventGodotDependencies` target when applying it |

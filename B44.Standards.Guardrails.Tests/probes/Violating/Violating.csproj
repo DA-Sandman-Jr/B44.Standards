@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Negative probe for the production-references-a-test-project rule, and
+       ONLY that rule: <Error> ends its target at the first failure, so a probe
+       that breaks two rules never exercises the second. Never built; see
+       ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ghost.Tests\Ghost.Tests.csproj" />
+  </ItemGroup>
+</Project>

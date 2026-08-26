@@ -29,6 +29,14 @@ on:
         required: false
         type: string
         default: '10.0.x'
+      allow-missing-solution:
+        description: >-
+          Skip the format gate when the repository has no root solution. Off by
+          default: a verification step that silently does nothing is worse than
+          one that fails, because it reports green either way.
+        required: false
+        type: boolean
+        default: false
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -52,8 +60,12 @@ jobs:
           # run, which made the "nothing to check" branch unreachable.
           SLN=$( { ls *.sln *.slnx 2>/dev/null || true; } | head -1 )
           if [ -z "$SLN" ]; then
-            echo "No solution at repo root — nothing to check."
-            exit 0
+            if [ "${{ inputs.allow-missing-solution }}" = "true" ]; then
+              echo "No solution at repo root; allow-missing-solution is set, so the format gate is deliberately skipped."
+              exit 0
+            fi
+            echo "::error::No solution at the repository root, so the format gate cannot run. Add one, or set allow-missing-solution: true to declare the gap on purpose."
+            exit 1
           fi
           dotnet format "$SLN" --verify-no-changes
 

@@ -1,12 +1,16 @@
-<!-- Paste into each game's Tests csproj (replace GAME). Fails the build if a
-     Godot dependency sneaks into the test/Core chain. -->
-<Target Name="PreventGodotDependencies" BeforeTargets="ResolveReferences">
-  <Error Condition="'@(ProjectReference->WithMetadataValue('Filename','GAME'))' != ''"
-         Text="GAME.Tests must remain core-only. Do not reference GAME.csproj; move testable logic into GAME.Core instead." />
-  <Error Condition="'@(PackageReference->WithMetadataValue('Identity','Godot.NET.Sdk'))' != ''"
-         Text="GAME.Tests must not reference Godot packages." />
-  <Error Condition="'@(PackageReference->WithMetadataValue('Identity','GodotSharp'))' != ''"
-         Text="GAME.Tests must not reference Godot packages." />
-  <Error Condition="'@(Reference->WithMetadataValue('Identity','GodotSharp'))' != ''"
-         Text="GAME.Tests must not reference Godot assemblies." />
-</Target>
+<!-- Retrofit for a test project that must stay engine-independent.
+
+     This used to be a pasted <Target>. It is now one property, because
+     B44.Standards 0.12.0 owns the check: it bans Godot and Unity symbols in
+     the project and fails the build when an engine assembly or source
+     generator reaches the resolved reference or analyzer graph — including
+     the transitive case where the test project references the Godot
+     presentation project, which a pasted list of package names missed.
+
+     Delete any local PreventGodotDependencies target when you add this. Do not
+     keep both: shared behaviour is fixed in the package that owns it, and a
+     local copy drifts the moment the package learns a new engine assembly
+     name. -->
+<PropertyGroup>
+  <B44EngineFree>true</B44EngineFree>
+</PropertyGroup>

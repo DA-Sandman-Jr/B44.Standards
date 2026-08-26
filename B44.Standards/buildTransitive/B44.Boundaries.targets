@@ -1,0 +1,168 @@
+<Project>
+  <!-- Engine and determinism boundaries. Imported by B44.Standards.targets, so
+       every condition here sees the consumer's own csproj properties: the
+       banned-symbol lists MUST be registered from a .targets file, because a
+       .props file is evaluated before the project body sets B44EngineFreeCore.
+
+       Layered enforcement, opt-in per project:
+         <B44EngineFreeCore>true</B44EngineFreeCore>  — engine-free Core of a
+             game or shared package. Implies B44EngineFree below and, because a
+             Core is also the deterministic authority, B44Deterministic.
+         <B44EngineFree>true</B44EngineFree>          — any project that must
+             build and test without an engine, including the test project that
+             covers a Core. Bans Godot and Unity APIs at the symbol level and
+             fails the build if an engine assembly appears in the resolved
+             reference graph (a symbol analyzer cannot reject an unused
+             dependency). Deliberately a flat list of the engines B44 actually
+             integrates, not an extensible engine-policy mechanism.
+         <B44Deterministic>true</B44Deterministic>    — ambient time/randomness
+             banned (injected TimeProvider / explicit random source). -->
+  <PropertyGroup>
+    <B44EngineFree Condition="'$(B44EngineFree)' == '' and '$(B44EngineFreeCore)' == 'true'">true</B44EngineFree>
+    <B44Deterministic Condition="'$(B44Deterministic)' == '' and '$(B44EngineFreeCore)' == 'true'">true</B44Deterministic>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(B44Deterministic)' == 'true'">
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)../config/BannedSymbols.Determinism.txt" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(B44EngineFree)' == 'true'">
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)../config/BannedSymbols.Godot.txt" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)../config/BannedSymbols.Unity.txt" />
+  </ItemGroup>
+
+  <UsingTask
+    TaskName="B44EngineBoundaryTask"
+    TaskFactory="RoslynCodeTaskFactory"
+    AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <ProjectName ParameterType="System.String" Required="true" />
+      <!-- Resolved compile references. Filenames are the evidence: an engine
+           assembly in the graph is a violation whether or not any symbol from
+           it is used yet. -->
+      <References ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
+      <!-- Resolved analyzers and source generators. An engine generator is an
+           engine dependency that never appears in @(ReferencePath). -->
+      <Analyzers ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
+      <!-- Assembly names (extension optional) exempted by the consumer, for the
+           rare non-engine package that collides with an engine prefix. -->
+      <AllowedNames ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="false" />
+      <!-- The shipped target passes FailOnViolation=true. It exists so the
+           build-only fixture can assert ViolationCount without its own
+           deliberate violations failing the fixture's build. -->
+      <FailOnViolation ParameterType="System.Boolean" Required="true" />
+      <ViolationCount ParameterType="System.Int32" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+        var allowed = new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+        foreach (var item in AllowedNames ?? System.Array.Empty<Microsoft.Build.Framework.ITaskItem>())
+        {
+            // Trim only a real assembly extension. GetFileNameWithoutExtension
+            // would turn the allowed name "Unity.Container" into "Unity",
+            // which then matches nothing and silently voids the exemption.
+            var allowedName = (item.ItemSpec ?? string.Empty).Trim();
+            if (allowedName.EndsWith(".dll", System.StringComparison.OrdinalIgnoreCase))
+            {
+                allowedName = allowedName.Substring(0, allowedName.Length - 4);
+            }
+            if (allowedName.Length > 0) allowed.Add(allowedName);
+        }
+
+        var violations = 0;
+
+        // "Godot*" covers GodotSharp, GodotSharpEditor, GodotPlugins and
+        // Godot.SourceGenerators. "UnityEngine*"/"UnityEditor*" are Unity's
+        // core managed assemblies; "Unity.*" covers its package modules
+        // (Unity.Mathematics, Unity.Collections, Unity.InputSystem, ...), which
+        // carry engine types without the UnityEngine prefix.
+        foreach (var kind in new[] { "reference", "analyzer" })
+        {
+            var items = string.Equals(kind, "reference", System.StringComparison.Ordinal) ? References : Analyzers;
+            foreach (var item in items ?? System.Array.Empty<Microsoft.Build.Framework.ITaskItem>())
+            {
+                var spec = item.ItemSpec ?? string.Empty;
+                if (spec.Length == 0) continue;
+
+                var name = System.IO.Path.GetFileNameWithoutExtension(spec);
+                if (allowed.Contains(name)) continue;
+
+                string message = null;
+                if (name.StartsWith("Godot", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    message = ProjectName + " is engine-free but resolves a Godot " + kind + " (" + name +
+                        "). Remove the Godot dependency; the project must build and test without the engine. " +
+                        "Godot-facing code belongs in the presentation project or in B44.Godot.";
+                }
+                else if (name.StartsWith("UnityEngine", System.StringComparison.OrdinalIgnoreCase) ||
+                         name.StartsWith("UnityEditor", System.StringComparison.OrdinalIgnoreCase) ||
+                         name.StartsWith("Unity.", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    message = ProjectName + " is engine-free but resolves a Unity " + kind + " (" + name +
+                        "). Remove the Unity dependency; the project must build and test without an engine. " +
+                        "Unity-facing code belongs in the B44.Unity integration package. If this assembly is not " +
+                        "a Unity engine assembly, exempt it with <B44EngineReferenceAllow Include=\"" + name + "\" />.";
+                }
+
+                if (message == null) continue;
+
+                violations++;
+                if (FailOnViolation) Log.LogError(null, "B44E001", null, null, 0, 0, 0, 0, message);
+                else Log.LogMessage(Microsoft.Build.Framework.MessageImportance.High, message);
+            }
+        }
+
+        ViolationCount = violations;
+
+        // Fail explicitly rather than relying on the logged errors. A caller
+        // that downgrades errors with ContinueOnError turns them into warnings
+        // before the task result is computed, and the gate would report
+        // success; returning false survives that downgrade.
+        if (FailOnViolation && violations > 0)
+        {
+            return false;
+        }
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="B44EnforceEngineFreeCore"
+          AfterTargets="ResolveReferences"
+          Condition="'$(B44EngineFree)' == 'true'">
+    <B44EngineBoundaryTask
+      ProjectName="$(MSBuildProjectName)"
+      References="@(ReferencePath)"
+      Analyzers="@(Analyzer)"
+      AllowedNames="@(B44EngineReferenceAllow)"
+      FailOnViolation="true" />
+  </Target>
+
+  <!-- The banned-symbol lists are inert unless a banned-API analyzer is
+       actually loaded. B44.Standards ships the lists as AdditionalFiles and
+       depends on the analyzer package, but a consumer can still lose it by
+       excluding analyzer assets, by importing this policy from a sibling clone
+       without the matching PackageReference, or by suppressing RS0030. Each of
+       those leaves a project that looks guarded and is not — so the guard
+       checks that it is switched on instead of assuming it. -->
+  <!-- '$(TargetFramework)' != '' skips the OUTER build of a multi-targeted
+       project. That pass resolves no analyzers by design and dispatches to the
+       inner builds, where the real check runs once per framework; without this
+       an invocation that reaches ResolveReferences on the outer build would
+       report every multi-targeted package as unguarded. -->
+  <Target Name="B44VerifyBannedSymbolGuard"
+          AfterTargets="ResolveReferences"
+          Condition="('$(B44EngineFree)' == 'true' or '$(B44Deterministic)' == 'true') and '$(B44VerifyBannedSymbolGuard)' != 'false' and '$(TargetFramework)' != ''">
+    <ItemGroup>
+      <_B44BannedApiAnalyzer Include="@(Analyzer)"
+                             Condition="$([System.String]::new('%(FileName)').Contains('BannedApiAnalyzers'))" />
+    </ItemGroup>
+    <Error Condition="'@(_B44BannedApiAnalyzer)' == ''"
+           Code="B44E002"
+           Text="$(MSBuildProjectName) enables a B44 banned-symbol boundary (B44EngineFree/B44Deterministic) but no banned-API analyzer is loaded, so every BannedSymbols entry is inert and the boundary is unenforced. Restore the Microsoft.CodeAnalysis.BannedApiAnalyzers reference that B44.Standards brings in, and do not exclude analyzer assets from the B44.Standards PackageReference." />
+    <Error Condition="$(NoWarn.Contains('RS0030'))"
+           Code="B44E003"
+           Text="$(MSBuildProjectName) suppresses RS0030 through NoWarn, which disables every B44 banned-symbol boundary in this project. Remove RS0030 from NoWarn; if one symbol genuinely needs an exception, raise it against the BannedSymbols list in B44.Standards." />
+  </Target>
+</Project>

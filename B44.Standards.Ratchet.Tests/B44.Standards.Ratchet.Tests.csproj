@@ -3,6 +3,12 @@
     <TargetFramework>net8.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- Named *.Tests but deliberately carries no test framework: every
+         assertion in this project is an MSBuild <Error> in a build target.
+         B44VerifyTestProjectIntegrity exists to catch a REAL test project
+         that lost its framework, so declare the exception rather than
+         disabling the check. -->
+    <B44BuildOnlyFixture>true</B44BuildOnlyFixture>
 
     <!-- Build-only integration fixture for the source-size ratchet, mirroring
          B44.Standards.AgentGuidance.Tests. It exercises the exact source target

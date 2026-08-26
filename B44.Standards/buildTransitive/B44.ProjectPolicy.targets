@@ -1,0 +1,117 @@
+<Project>
+  <!-- Per-project verification-integrity checks. Everything here is evaluated
+       once per project during its own build, reads only evidence MSBuild
+       already has, and needs no configuration file. Each check exists because
+       the failure it catches otherwise produces a GREEN build.
+
+       Every check can be switched off individually with its named property.
+       Doing so is a visible act in a reviewed file, which is the point. -->
+
+  <!-- ── Test-infrastructure integrity ────────────────────────────────────
+       A *.Tests project that is not actually a test project still builds,
+       still restores, and still reports success under `dotnet test` — it just
+       runs nothing. Both shapes B44 uses are accepted:
+         VSTest        (Microsoft.NET.Test.Sdk)  => IsTestProject
+         Testing Platform (xunit.v3 and friends) => IsTestingPlatformApplication
+       A build-only MSBuild fixture that is named *.Tests but deliberately has
+       no test framework sets B44BuildOnlyFixture=true. -->
+  <Target Name="B44VerifyTestProjectIntegrity"
+          BeforeTargets="PrepareForBuild"
+          Condition="$(MSBuildProjectName.EndsWith('.Tests')) and '$(B44BuildOnlyFixture)' != 'true' and '$(B44TestProjectIntegrity)' != 'false'">
+    <Error Condition="'$(IsTestProject)' != 'true' and '$(IsTestingPlatformApplication)' != 'true'"
+           Code="B44T001"
+           Text="$(MSBuildProjectName) is named as a test project but declares no test framework, so it discovers no tests and `dotnet test` reports success without running anything. Reference a test framework (xunit.v3, or Microsoft.NET.Test.Sdk for VSTest). If this project is a build-only MSBuild fixture, set B44BuildOnlyFixture=true to say so explicitly." />
+    <!-- Microsoft.Testing.Platform projects need this opt-in for `dotnet test`
+         to hand the run to the platform. Without it the command restores,
+         exits 0, and runs no tests — the exact false green this file targets. -->
+    <Error Condition="'$(IsTestingPlatformApplication)' == 'true' and '$(TestingPlatformDotnetTestSupport)' != 'true'"
+           Code="B44T002"
+           Text="$(MSBuildProjectName) is a Microsoft.Testing.Platform test project but does not set TestingPlatformDotnetTestSupport=true, so `dotnet test` exits successfully without running its tests. Add &lt;TestingPlatformDotnetTestSupport&gt;true&lt;/TestingPlatformDotnetTestSupport&gt;." />
+  </Target>
+
+  <!-- VSTest treats a run that discovered zero tests as success. The shipped
+       runsettings turns that into a failure — a floor of one discovered test,
+       not an expected count, so the check never needs updating as suites grow.
+       Microsoft.Testing.Platform already enforces the same floor itself
+       (its minimum-expected-tests option defaults to 1) and takes no runsettings here.
+       Only applied when the consumer has not chosen its own runsettings. -->
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true' and '$(RunSettingsFilePath)' == '' and '$(B44TestRunSettings)' != 'false'">
+    <RunSettingsFilePath>$(MSBuildThisFileDirectory)../config/B44.Tests.runsettings</RunSettingsFilePath>
+  </PropertyGroup>
+
+  <!-- ── Reference policy ─────────────────────────────────────────────────
+       Two objectively decidable rules over items MSBuild already evaluated. -->
+  <Target Name="B44VerifyReferencePolicy"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(B44ReferencePolicy)' != 'false'">
+    <ItemGroup>
+      <!-- Production code referencing a test assembly drags test-only
+           dependencies into shipped output and inverts the dependency
+           direction. Test projects may reference each other; production may
+           not reach into them. -->
+      <_B44TestProjectReference Include="@(ProjectReference)"
+                               Condition="$([System.String]::new('%(FileName)').EndsWith('.Tests'))" />
+
+      <!-- Organization guidance: internal B44 packages use compatibility-
+           bounded floats everywhere, including production. `0.11.*` and
+           `0.1.*-*` are bounded; a bare `*` is not, and silently crosses the
+           breaking boundary the package owner set. -->
+      <_B44InternalPackage Include="@(PackageReference)"
+                          Condition="$([System.String]::new('%(Identity)').StartsWith('B44.')) and '%(Version)' != ''" />
+      <_B44UnboundedPackage Include="@(_B44InternalPackage)"
+                           Condition="'%(Version)' == '*' or '%(Version)' == '*-*'" />
+      <_B44UnfloatedPackage Include="@(_B44InternalPackage)"
+                           Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('%(Version)', '^[0-9]+\.([0-9]+\.)?\*(-\*)?$'))" />
+    </ItemGroup>
+
+    <Error Condition="'@(_B44TestProjectReference)' != '' and '$(IsTestProject)' != 'true' and '$(IsTestingPlatformApplication)' != 'true' and '$(B44BuildOnlyFixture)' != 'true'"
+           Code="B44P002"
+           Text="$(MSBuildProjectName) is a production project but references a test project (@(_B44TestProjectReference->'%(FileName)', ', ')). Move whatever it needs into a production project; production must never depend on a test assembly." />
+
+    <Error Condition="'@(_B44UnboundedPackage)' != ''"
+           Code="B44P003"
+           Text="$(MSBuildProjectName) references internal package(s) @(_B44UnboundedPackage->'%(Identity)', ', ') with an unbounded version float. Use a compatibility-bounded float instead: pre-1.0 packages use 0.&lt;minor&gt;.*, stable packages use &lt;major&gt;.*. An unbounded * crosses a breaking boundary without anyone deciding to." />
+
+    <Warning Condition="'@(_B44UnfloatedPackage)' != '' and '@(_B44UnboundedPackage)' == ''"
+             Code="B44P001"
+             Text="$(MSBuildProjectName) pins internal package(s) @(_B44UnfloatedPackage->'%(Identity)', ', ') to an exact version. B44 consumers use compatibility-bounded floats (0.&lt;minor&gt;.* pre-1.0, &lt;major&gt;.* stable) so patches arrive without a manual bump. Pin deliberately or not at all." />
+  </Target>
+
+  <!-- ── Warning and analyzer hygiene (opt in with B44WarningPolicy=true) ──
+       Not a style policy: every rule here is about diagnostics staying VISIBLE.
+       Opt-in because two active consumers do not yet run warnings-as-errors,
+       and a gate that turns their builds red on upgrade would be a flag day
+       rather than a guardrail. -->
+  <Target Name="B44VerifyWarningPolicy"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(B44WarningPolicy)' == 'true'">
+    <ItemGroup>
+      <_B44NoWarnEntry Include="$(NoWarn)" />
+      <_B44NoWarnAllowed Include="$(B44AllowedNoWarn)" />
+      <_B44NoWarnUnexpected Include="@(_B44NoWarnEntry)" Exclude="@(_B44NoWarnAllowed)" />
+    </ItemGroup>
+
+    <Error Condition="'$(TreatWarningsAsErrors)' != 'true'"
+           Code="B44W001"
+           Text="$(MSBuildProjectName) sets B44WarningPolicy but not TreatWarningsAsErrors=true. Warnings that do not fail the build accumulate until nobody reads them." />
+    <Error Condition="'$(Nullable)' != 'enable'"
+           Code="B44W002"
+           Text="$(MSBuildProjectName) sets B44WarningPolicy but Nullable is '$(Nullable)'. Nullable warnings must stay visible; enable it or drop the policy explicitly." />
+    <!-- EnableNETAnalyzers is only evidence of a decision on .NETCoreApp: the
+         SDK leaves it false by default on netstandard and .NET Framework, and
+         reading that default as tampering would fail every policy-carrier and
+         netstandard package in the portfolio. -->
+    <Error Condition="'$(RunAnalyzers)' == 'false' or '$(RunAnalyzersDuringBuild)' == 'false' or ('$(EnableNETAnalyzers)' == 'false' and '$(TargetFrameworkIdentifier)' == '.NETCoreApp')"
+           Code="B44W003"
+           Text="$(MSBuildProjectName) sets B44WarningPolicy but disables analyzers (RunAnalyzers/RunAnalyzersDuringBuild/EnableNETAnalyzers). The B44 severity globalconfig cannot report anything with the analyzers switched off." />
+    <Error Condition="'$(AnalysisMode)' == 'None' or '$(AnalysisMode)' == 'AllDisabledByDefault'"
+           Code="B44W004"
+           Text="$(MSBuildProjectName) sets B44WarningPolicy but AnalysisMode is '$(AnalysisMode)', which disables the SDK analyzer set that B44.Standards configures severities for." />
+    <Error Condition="'$(WarningsNotAsErrors)' != ''"
+           Code="B44W005"
+           Text="$(MSBuildProjectName) demotes $(WarningsNotAsErrors) out of warnings-as-errors. A project-wide demotion is invisible at the call site; suppress the specific occurrence in source instead, where review can see it." />
+    <Error Condition="'@(_B44NoWarnUnexpected)' != ''"
+           Code="B44W006"
+           Text="$(MSBuildProjectName) suppresses @(_B44NoWarnUnexpected, ', ') project-wide through NoWarn. A project-wide NoWarn hides every future occurrence, including ones nobody has written yet. Fix the diagnostic, suppress it at the single site that needs it, or add the code to B44AllowedNoWarn with a comment saying why." />
+  </Target>
+</Project>
