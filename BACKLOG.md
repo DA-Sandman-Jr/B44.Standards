@@ -139,9 +139,9 @@ original review.
 3. **Ambient determinism restrictions.** **Evaluated 2026-08-30 — completed the
    existing ban list, declined the rest.** See "Ambient determinism: what the
    boundary already holds" below.
-4. **Deterministic string and culture semantics.** Measure `CA1309` / `CA1310`,
-   then decide whether machine-readable authority can be told from localized
-   presentation with acceptably low noise.
+4. **Deterministic string and culture semantics.** **Evaluated 2026-08-30 — the
+   rules were already enforced; pinned them so they stay that way.** See
+   "String and culture semantics: already enforced, now unconditional" below.
 5. **Environmental-effect and serialization fences.** Confirm the reusable
    authority boundary before prohibiting filesystem, networking, process, or
    concrete serialization APIs.
@@ -291,6 +291,89 @@ This also records a gap in how that analyzer bump was measured: the hard rule
 is to measure an analyzer upgrade against every active consumer before
 publishing, and three consumers were on `0.6.*` and therefore untested against
 3.0.138 at the time.
+
+### String and culture semantics: already enforced, now unconditional
+
+**Status:** **Done** on 2026-08-30, in 0.15.0 (built and measured, not released
+— see the coordination note at the end).
+
+The backlog asked whether to enforce `CA1309`/`CA1310`. They were already
+enforced, at error severity, in every consumer. What was not sound was *why*
+they were enforced.
+
+**What the current policy already catches.** Compiling one construct at a time
+into a real deterministic Core (`NowhereToNest.Core`), with that repository's
+own settings, every ambient-culture form is a hard build error today:
+
+| Construct | Diagnostic |
+|---|---|
+| `a.Equals(b)` | `MA0001` + `CA1309` |
+| `string.Compare(a, b)` | `CA1309` + `CA1310` |
+| `a.CompareTo(b)`, `StartsWith(string)`, `EndsWith(string)` | `CA1310` |
+| `a.ToUpper()` / `ToLower()` | `CA1304` + `CA1311` |
+| `int.Parse(s)`, `d.ToString()`, `string.Format(...)` | `CA1305` |
+| `xs.OrderBy(x => x)`, `Array.Sort(strings)` | `MA0002` |
+| `StringComparison.InvariantCulture` / `.CurrentCulture` in equality | `CA1309` |
+
+Explicit ordinal and explicit invariant forms compile clean. `MA0001`/`MA0002`
+were already pinned in `B44.globalconfig`; the `CA` rules were on because
+`AnalysisMode` defaults to `Recommended`.
+
+**The real gap was the mode, not the rules.** Rebuilding the same probe under
+each mode:
+
+| `AnalysisMode` | Culture rules |
+|---|---|
+| `Recommended` (the B44 default) | `CA1304 CA1305 CA1309 CA1310 CA1311` |
+| `All` | the same five |
+| `Default` | **none** |
+| `Minimum` | **none** |
+
+`B44.Standards.props` only *defaults* `AnalysisMode` to `Recommended`, so a
+consumer that set it for an unrelated reason would silently lose the entire
+family — and `B44WarningPolicy` would not object, because `B44W004` rejects only
+`None` and `AllDisabledByDefault`. The severities are now pinned explicitly in
+`B44.globalconfig`, at `warning`, which is exactly what they already were under
+`Recommended`. Nothing is escalated; the enforcement simply stops depending on a
+property nobody guards.
+
+**Noise and suppression pressure: none, measured.** Across every active
+repository there is not one `NoWarn`, `#pragma`, or `SuppressMessage` for
+`CA1304`, `CA1305`, `CA1307`, `CA1309`, `CA1310`, `CA1311`, `CA1862`, `CA1866`,
+`MA0001` or `MA0002`. All twelve consumers run `TreatWarningsAsErrors` **and**
+`B44WarningPolicy`, so the rules have been errors for as long as they have been
+on, and nobody has had to argue with one.
+
+The reason the pressure is zero is architectural, not luck: B44 games localize
+through Godot's `TranslationServer` behind an engine-free `GameText` adapter, so
+player-facing text never travels through .NET culture APIs, and translation keys
+are compared with `StringComparer.Ordinal` like any other token. Localized
+behaviour stays expressible — these rules ask for the culture to be *named*, not
+for it to be invariant — and `CulturePresentation` probes exactly that.
+`B44.GameSystems.Inventory.Tests` goes further and runs authority operations
+under a foreign culture through an `UnderCulture` helper, asserting the results
+are identical.
+
+**Not mechanically decidable, and deliberately left alone.** Two forms compile
+clean and always will: a collection keyed by `StringComparer.CurrentCulture`,
+and `ToUpper(CultureInfo.CurrentCulture)` used to normalize a key. Both require
+someone to name `CurrentCulture` deliberately, and neither is separable from
+legitimate presentation by any analyzer. Also out of reach, and not a culture
+problem: using a string hash as durable identity. `MA0001` pushes
+`a.GetHashCode()` toward an explicit `StringComparison`, but every string hash
+is randomized per process, and telling a transient dictionary from a
+content-addressed id is a persistence-design question, not a decidable one.
+
+**Measured before release.** All twelve active consumers rebuilt against the
+pinned config: zero `CA1304`/`CA1305`/`CA1309`/`CA1310`/`CA1311` diagnostics and
+zero build failures. Nothing changes for any consumer today, because all of them
+are on `Recommended` already; what changes is that none of them can lose the
+family by accident.
+
+**Coordination.** A configuration that used to pass can now fail, so enforcement
+formally expands and this sits at 0.15.0 on `main`, untagged and unpublished,
+with no consumer migrated. Consumers are still on `0.12.*`, with `0.13.0` and
+`0.14.0` already published ahead of them.
 
 ### Ambient determinism: what the boundary already holds
 

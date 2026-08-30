@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Positive probe: player-facing presentation, off the deterministic
+       boundary, deliberately formatting and casing for the reader's culture.
+       Localized behaviour has to stay expressible; what the rules ask for is
+       that the culture be named, not that it be invariant. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AnalysisMode>Default</AnalysisMode>
+  </PropertyGroup>
+</Project>

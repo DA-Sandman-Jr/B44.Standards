@@ -23,6 +23,28 @@ dotnet_diagnostic.CA1016.severity = none
 # are rare and review-caught.
 dotnet_diagnostic.CA1001.severity = none
 
+# ── String and culture semantics ───────────────────────────────────────────
+# These are SDK rules that B44 already relies on: ambient equality, ordering,
+# prefixes, casing, parsing and formatting all fail the build today, because
+# every consumer runs TreatWarningsAsErrors and B44WarningPolicy keeps it that
+# way. They are pinned here because that was contingent on AnalysisMode, which
+# B44.Standards.props only DEFAULTS to Recommended: a consumer that set
+# AnalysisMode=Default or Minimum for an unrelated reason silently lost the
+# whole family, and B44W004 would not object — it rejects only None and
+# AllDisabledByDefault. An explicit severity does not depend on the mode.
+#
+# Severity is deliberately warning, matching what these already are under
+# Recommended. Consumers make them errors; this file does not escalate them.
+# CA1304 culture-dependent casing; CA1311 the same call without a culture.
+dotnet_diagnostic.CA1304.severity = warning
+dotnet_diagnostic.CA1311.severity = warning
+# CA1305 IFormatProvider on parse/format — ambient culture reaching a token.
+dotnet_diagnostic.CA1305.severity = warning
+# CA1309 ordinal instead of culture-sensitive equality and comparison.
+dotnet_diagnostic.CA1309.severity = warning
+# CA1310 StringComparison on the correctness-critical overloads.
+dotnet_diagnostic.CA1310.severity = warning
+
 # ── Meziantou curated allowlist (MeziantouAnalysisMode=None turns the rest
 #    off; these opt back in). Defect-focused; style and speculative-perf
 #    rules deliberately excluded. Validate empirically before promoting any

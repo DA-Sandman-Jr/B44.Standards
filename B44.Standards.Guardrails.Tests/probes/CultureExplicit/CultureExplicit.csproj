@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Positive probe: the same operations written ordinally and invariantly.
+       Also AnalysisMode=Default, so it proves the pin rejects the ambient
+       forms without rejecting the forms it steers callers towards. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AnalysisMode>Default</AnalysisMode>
+    <B44Deterministic>true</B44Deterministic>
+  </PropertyGroup>
+</Project>

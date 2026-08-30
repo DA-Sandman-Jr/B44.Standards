@@ -26,7 +26,7 @@
          actually passing negative tests. -->
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44E001;B44H002;B44S001;B44S002</MSBuildWarningsAsMessages>
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44T001;B44T002;B44P002;B44P003;B44W001;B44W006;B44E004;B44E005;B44T003</MSBuildWarningsAsMessages>
-    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44H003;B44H004;B44R002;B44R003;RS0030</MSBuildWarningsAsMessages>
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44H003;B44H004;B44R002;B44R003;RS0030;CA1304;CA1305;CA1309;CA1310;CA1311</MSBuildWarningsAsMessages>
   </PropertyGroup>
 
   <!-- ── Target-based guards ─────────────────────────────────────────────────
@@ -213,6 +213,68 @@
     </PropertyGroup>
     <Error Condition="'$(_CleanBanResults)' != '0,0'"
            Text="Determinism ban probe outcomes were '$(_CleanBanResults)', expected '0,0' for: @(_CleanBanProbe->'%(Identity) [%(Why)]', '; '). The ban is rejecting injected time or leaking into code that never opted in." />
+  </Target>
+
+  <!-- ── String and culture semantics ────────────────────────────────────
+       CA1304/CA1305/CA1309/CA1310/CA1311 come from the SDK, not from a B44
+       list, and they are on only because AnalysisMode says so.
+       B44.Standards.props merely DEFAULTS that to Recommended, so a consumer
+       setting AnalysisMode for an unrelated reason silently lost the whole
+       family. B44.globalconfig now pins their severities, and every probe here
+       sets AnalysisMode=Default — the mode under which they would otherwise be
+       off — so these assertions fail the moment the pin is dropped. -->
+  <Target Name="VerifyCultureSemanticsProbes" BeforeTargets="Build">
+    <Exec Command="dotnet build &quot;$(MSBuildProjectDirectory)/probes/CultureAmbient/CultureAmbient.csproj&quot; -t:Rebuild -nologo -v:q -nodeReuse:false"
+          IgnoreExitCode="true"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low"
+          ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ExitCode" PropertyName="_CultureExit" />
+      <Output TaskParameter="ConsoleOutput" ItemName="_CultureOutput" />
+    </Exec>
+    <PropertyGroup>
+      <_CultureLog>@(_CultureOutput, '|')</_CultureLog>
+    </PropertyGroup>
+    <Error Condition="'$(_CultureExit)' == '0'"
+           Text="The CultureAmbient probe compiled. Culture-sensitive equality, ordering, casing, parsing and formatting must be rejected on values that stand for machine-readable authority." />
+    <!-- Per code, not by exit code: the probe trips five rules, so dropping one
+         pinned severity would still leave the build failing on the other four
+         and an exit-code-only assertion would not notice. -->
+    <ItemGroup>
+      <_CultureRule Include="CA1304"><What>culture-dependent casing</What></_CultureRule>
+      <_CultureRule Include="CA1305"><What>an IFormatProvider on parse and format</What></_CultureRule>
+      <_CultureRule Include="CA1309"><What>ordinal instead of culture-sensitive equality</What></_CultureRule>
+      <_CultureRule Include="CA1310"><What>StringComparison on the correctness-critical overloads</What></_CultureRule>
+      <_CultureRule Include="CA1311"><What>a named culture on ToUpper/ToLower</What></_CultureRule>
+    </ItemGroup>
+    <Error Condition="!$(_CultureLog.Contains('%(_CultureRule.Identity)'))"
+           Text="%(_CultureRule.Identity) did not fire in the CultureAmbient probe, which asks for %(_CultureRule.What). Its severity is no longer pinned in B44.globalconfig, so it is off wherever AnalysisMode is not Recommended." />
+
+    <!-- Positive probes. The second is what keeps the rule honest: these rules
+         ask for the culture to be NAMED, not for it to be invariant, so
+         player-facing text that formats and sorts for the reader's culture has
+         to keep compiling. -->
+    <ItemGroup>
+      <_CleanCultureProbe Include="CultureExplicit">
+        <Why>the same authoritative operations written ordinally and invariantly</Why>
+      </_CleanCultureProbe>
+      <_CleanCultureProbe Include="CulturePresentation">
+        <Why>off-boundary presentation formatting and sorting for the reader's culture</Why>
+      </_CleanCultureProbe>
+    </ItemGroup>
+    <Exec Command="dotnet build &quot;$(MSBuildProjectDirectory)/probes/%(_CleanCultureProbe.Identity)/%(_CleanCultureProbe.Identity).csproj&quot; -t:Rebuild -nologo -v:q -nodeReuse:false"
+          IgnoreExitCode="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low"
+          ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ExitCode" ItemName="_CleanCultureResult" />
+    </Exec>
+    <PropertyGroup>
+      <_CleanCultureResults>@(_CleanCultureResult, ',')</_CleanCultureResults>
+    </PropertyGroup>
+    <Error Condition="'$(_CleanCultureResults)' != '0,0'"
+           Text="Culture probe outcomes were '$(_CleanCultureResults)', expected '0,0' for: @(_CleanCultureProbe->'%(Identity) [%(Why)]', '; '). The pinned rules are rejecting explicit ordinal code, or localized presentation that names its culture." />
   </Target>
 
   <!-- ── Engine boundary ─────────────────────────────────────────────────── -->

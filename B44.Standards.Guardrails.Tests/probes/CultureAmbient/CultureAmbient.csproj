@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Negative probe: culture-sensitive equality, ordering, prefixes, casing,
+       parsing and formatting on values that stand for machine-readable
+       authority. AnalysisMode=Default on purpose — under the SDK default these
+       rules are off, so this probe only fails while B44.globalconfig pins them
+       explicitly. Built, not evaluated: they are Roslyn analyzers. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AnalysisMode>Default</AnalysisMode>
+    <B44Deterministic>true</B44Deterministic>
+  </PropertyGroup>
+</Project>
