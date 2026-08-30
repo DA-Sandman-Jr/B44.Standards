@@ -134,10 +134,8 @@ which is why that check is opt-in rather than always on.
 Sequenced after the first pass has been lived with. Numbering follows the
 original review.
 
-2. **Explicit public API manifests.** `Microsoft.CodeAnalysis.PublicApiAnalyzers`
-   with `PublicAPI.Shipped.txt` / `PublicAPI.Unshipped.txt` for genuinely
-   reusable packages. Confirm the overlap with package compatibility policy and
-   whether unreleased packages should participate.
+2. **Explicit public API manifests.** **Evaluated 2026-08-30 — not adopted.**
+   See "Public API manifests: measured and declined" below.
 3. **Ambient determinism restrictions.** Baseline and classify `Guid.NewGuid`,
    tick counts, `Stopwatch`, and entropy sources before banning any of them.
 4. **Deterministic string and culture semantics.** Measure `CA1309` / `CA1310`,
@@ -260,6 +258,81 @@ This also records a gap in how that analyzer bump was measured: the hard rule
 is to measure an analyzer upgrade against every active consumer before
 publishing, and three consumers were on `0.6.*` and therefore untested against
 3.0.138 at the time.
+
+### Public API manifests: measured and declined
+
+**Status:** **Evaluated** on 2026-08-30, **not adopted**. Revisit only on the
+trigger below.
+
+`Microsoft.CodeAnalysis.PublicApiAnalyzers` 4.14.0 was piloted on `B44.Common`
+and measured against every reusable B44 library. It works, it catches a real
+class of mistake, and it still costs more than the mistake does.
+
+**What it catches that nothing here does.** Three mutations were applied to
+`B44.Common` and built against the full current check set — analyzers,
+warnings-as-errors, the ratchet, banned symbols, 50 tests:
+
+| Mutation | Current checks | With the analyzer |
+|---|---|---|
+| `internal` helper made `public` | build and tests green | RS0016 |
+| Parameter renamed on a public method | build and tests green | RS0016 + RS0017 |
+| Optional parameter added (binary-breaking) | build and tests green | RS0016 + RS0017 |
+| Public return type widened to nullable | build and tests green | RS0036 |
+
+The blindness is structural, not a gap in the suites: a test suite exercises the
+API it knows about, so *widening* is invisible to it, and a first-party consumer
+only notices a *narrowing* when it happens to use the member. That is a genuine
+hole.
+
+**What it costs.** Manifest lines needed, and how much of each manifest is
+compiler-synthesized record members (`Deconstruct`, `PrintMembers`, `==`,
+`ToString`, `Equals`, `GetHashCode`):
+
+| Library | Version | Entries | Synthesized |
+|---|---|---|---|
+| `B44.GameSystems.Shell` | 0.1.0-alpha.6 | 66 | 7 (11%) |
+| `B44.Common` | 0.11.2 | 91 | 14 (15%) |
+| `B44.Godot` | 0.3.2 | 112 | 22 (20%) |
+| `BookshelfReader` | 3.2.0 | 349 | 47 (13%) |
+| `Continuity` | 1.1.10 | 997 | 315 (32%) |
+| `B44.GameSystems.OperationCore` | 0.1.0-alpha.6 | 1325 | 415 (31%) |
+| `B44.GameSystems.Inventory` | 0.1.0-alpha.6 | 3446 | 1361 (40%) |
+
+6,386 committed lines across seven libraries, a third of them members no one
+wrote. Public declarations changed in 8 of `B44.Common`'s last 26 commits, 4 of
+`BookshelfReader`'s last 8, and 19 of `B44.GameSystems.Inventory`'s last 30 — so
+between a third and two thirds of commits to a library would carry a manifest
+edit as well.
+
+**Bootstrapping is not a one-liner from a terminal.** The supported path is the
+IDE code fix. Building the 91-line `B44.Common` manifest from diagnostics took
+four build-edit passes: RS0016 gives the symbol without nullability, RS0037 then
+demands `#nullable enable`, RS0036 asks for annotations it only partly supplies,
+and compiler-synthesized record members turn out to need the `~` oblivious
+prefix, which no diagnostic prints. B44 works from terminals and agents, not
+IDEs, so that path is the normal one here, not the fallback.
+
+**Prerelease is the deciding condition.** Five of the seven libraries are pre-1.0
+or alpha, where API churn is the plan rather than the hazard. `B44.Common`'s own
+rule is `0.x.y` while the API churns. The shipped/unshipped split assumes a
+release ritual — move `Unshipped` into `Shipped` at each publish — which is a new
+step in every package's release for packages whose current job is to change
+shape. Consumers are all first-party, all on compatibility-bounded floats that
+this package already enforces, so a breaking change reaches them at a boundary
+they cross deliberately.
+
+**Decision: do not adopt, for any scope.** The guard is real but the mistake is
+not recurring: no accidental public API change appears anywhere in the history
+of the seven libraries. Adopting would buy protection against a hypothetical at
+the price of 6,386 maintained lines and a manifest edit on up to two thirds of
+library commits — the opposite of a boring automated failure.
+
+**Revisit when** a package has an external consumer, or at `B44.Common` 1.0 —
+whichever comes first. At that point compare against .NET Package Validation
+(item 12), which diffs against the previously published package and needs no
+committed manifest at all. On the evidence here it is the better-shaped tool for
+what B44 actually risks, and item 12's existing condition — a meaningful
+compatibility baseline — is the same trigger.
 
 ## Known defects
 
