@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Positive probe: the same ambient calls in a project that does NOT
+       declare the deterministic boundary. Ordinary applications, tooling and
+       diagnostics read the clock on purpose; the ban must stay scoped to
+       projects that opt in, and must not leak portfolio-wide. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <B44Deterministic>false</B44Deterministic>
+  </PropertyGroup>
+</Project>

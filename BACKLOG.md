@@ -136,8 +136,9 @@ original review.
 
 2. **Explicit public API manifests.** **Evaluated 2026-08-30 — not adopted.**
    See "Public API manifests: measured and declined" below.
-3. **Ambient determinism restrictions.** Baseline and classify `Guid.NewGuid`,
-   tick counts, `Stopwatch`, and entropy sources before banning any of them.
+3. **Ambient determinism restrictions.** **Evaluated 2026-08-30 — completed the
+   existing ban list, declined the rest.** See "Ambient determinism: what the
+   boundary already holds" below.
 4. **Deterministic string and culture semantics.** Measure `CA1309` / `CA1310`,
    then decide whether machine-readable authority can be told from localized
    presentation with acceptably low noise.
@@ -290,6 +291,102 @@ This also records a gap in how that analyzer bump was measured: the hard rule
 is to measure an analyzer upgrade against every active consumer before
 publishing, and three consumers were on `0.6.*` and therefore untested against
 3.0.138 at the time.
+
+### Ambient determinism: what the boundary already holds
+
+**Status:** **Done** on 2026-08-30, in 0.14.0 (built and measured, not yet
+released — see the coordination note at the end).
+
+The boundary was already there. `B44Deterministic` — implied by
+`B44EngineFreeCore` — applies `BannedSymbols.Determinism.txt` to 26 projects,
+and that list already bans `DateTime.Now`/`UtcNow`, the `DateTimeOffset`
+equivalents, both `System.Random` constructors, and `Random.Shared`. The
+question was not whether to build a determinism rule; it was which of the
+remaining ambient sources belong in the list that exists.
+
+**What is actually on the boundary.** Thirteen non-test occurrences of ambient
+nondeterminism across all 26 projects:
+
+| Site | API | Classification |
+|---|---|---|
+| `B44.Common` `SystemRandomSource` | `new Random()` ×3 | the sanctioned wrapper the ban points callers to; already banned, already suppressed with `#pragma warning disable RS0030` and paid for by the repository's suppression budget |
+| `B44.Common` `StructuredGameLogger` | `Guid.NewGuid` ×2 | log correlation ids — ambient by design, never reaches authoritative state |
+| `Continuity` `CanonContinuityChecker` | `Stopwatch` ×3, `GetTimestamp` ×2 | elapsed-time measurement written to an `Elapsed` diagnostic field on a result record |
+| `Continuity` `PrologProcessRunner` | `Guid.NewGuid`, `GetTempFileName` | unique temp path for a subprocess — nondeterminism is the point |
+| `BookshelfReader` processing service | `Guid.NewGuid`, `Stopwatch` | job identity and timing |
+| `ThemedWeatherImages` ×4 | `TimeProvider.System` | composition root and three Functions entry points supplying the system clock to injected consumers |
+| `Whispers.Core` `SessionSaveBuilder` | `TimeProvider.System` | a parameterless constructor defaulting to the ambient clock, inside a Core, writing `SavedAtUtc` into the save envelope |
+
+Every one is intentional, diagnostic, or a composition root — except the last,
+which is discussed below.
+
+**What the current checks catch.** A probe file was compiled into a real
+deterministic Core (`NowhereToNest.Core`), one ambient call at a time:
+
+| Call | Result |
+|---|---|
+| `DateTime.UtcNow` | rejected (`RS0030`) |
+| `new Random()` | rejected (`RS0030`) |
+| `DateTime.Today` | **compiled clean** |
+| `Environment.TickCount64` | **compiled clean** |
+| `Stopwatch.GetTimestamp` | **compiled clean** |
+| `TimeProvider.System` | **compiled clean** |
+| `Guid.NewGuid` | **compiled clean** |
+| `Guid.CreateVersion7` | **compiled clean** |
+
+`DateTime.Today` is the one that matters most: `DateTime.Now` is banned and
+`.Today` is the same ambient clock one member over, so the ban as written told a
+caller exactly how to route around it. The same is true of `Random.Shared` being
+banned while `RandomNumberGenerator` was not — the ban message says "inject an
+explicit random source", and the nearest unbanned RNG is one namespace away.
+
+**Adopted — four entries, zero exception pressure.** `DateTime.Today`,
+`Environment.TickCount`, `Environment.TickCount64`, and the
+`RandomNumberGenerator` type. Each has **zero** uses across all 26 boundary
+projects today, so nothing turns red, and no deterministic replayable
+computation can legitimately read an ambient local date, an ambient monotonic
+counter, or unseedable crypto entropy. This completes a rule that already ships
+rather than adding a new one: no new property, no new mechanism, no framework.
+
+**Declined, on measured evidence:**
+
+- **`Guid.NewGuid`** — 4 boundary uses, all legitimate (log correlation ids,
+  temp-file identity, job identity). Banning it buys one exception per use and
+  decides nothing a reader could not already see.
+- **`Stopwatch`** — 6 boundary uses. `Continuity` puts measured elapsed time in
+  an `Elapsed` field on a returned record, which is a grey zone rather than a
+  decidable violation: diagnostics on an authoritative result. A rule that needs
+  that judgement is not mechanical.
+- **`TimeProvider.System`** — 5 boundary uses, 4 of them composition roots doing
+  exactly the right thing. The honest rule would be "may be read only where it
+  is handed to something else", which no symbol list can express.
+
+The fence is therefore deliberately incomplete: a caller blocked on
+`Environment.TickCount` can still reach `Stopwatch.GetTimestamp`. What closes is
+the accidental path — reaching for the nearest ambient number after the existing
+ban fires — not a determined one.
+
+**Observation for `WhispersOfTheEarth`, not a Standards change.**
+`Whispers.Core/Saves/SessionSaveBuilder` has a parameterless constructor
+defaulting to `TimeProvider.System`, used by the production `FlowCoordinator`
+autoload and six test call sites, and the value it produces is written to
+`SavedAtUtc` in the save envelope. That repository's own `CLAUDE.md` says Core
+receives wall-clock time through an *injected* `TimeProvider`. Whether a
+defaulted ambient clock satisfies that is a design question for its owner; the
+injected overload and a `savedAtUtc` parameter both already exist. Recorded here
+because it was found while measuring, and deliberately not changed.
+
+**Measured before release.** All eleven active consumers were rebuilt against
+the candidate list — every boundary project plus `Whispers.Core.Tests`, which is
+on the boundary too — with zero `RS0030` and zero build failures.
+`ThemedWeatherImages` is on `0.6.*` and outside the active set; its four
+`TimeProvider.System` uses are unaffected either way, since that API was not
+banned.
+
+**Coordination.** Enforcement expands, so this sits at 0.14.0 on `main`,
+untagged and unpublished, and no consumer has been migrated. The documented
+consumer boundary stays `0.13.*` until someone decides to release; publishing
+0.14.0 is what moves it.
 
 ### Public API manifests: measured and declined
 

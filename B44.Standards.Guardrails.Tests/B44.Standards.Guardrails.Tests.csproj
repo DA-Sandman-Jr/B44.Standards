@@ -26,7 +26,7 @@
          actually passing negative tests. -->
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44E001;B44H002;B44S001;B44S002</MSBuildWarningsAsMessages>
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44T001;B44T002;B44P002;B44P003;B44W001;B44W006;B44E004;B44E005;B44T003</MSBuildWarningsAsMessages>
-    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44H003;B44H004;B44R002;B44R003</MSBuildWarningsAsMessages>
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44H003;B44H004;B44R002;B44R003;RS0030</MSBuildWarningsAsMessages>
   </PropertyGroup>
 
   <!-- ── Target-based guards ─────────────────────────────────────────────────
@@ -148,6 +148,71 @@
     </PropertyGroup>
     <Error Condition="'$(_ProbeResults)' != '$(_ExpectedResults)'"
            Text="Project-policy probe outcomes were '$(_ProbeResults)', expected '$(_ExpectedResults)' (0 = target passed, 1 = target failed) for: @(_Probe->'%(Identity) [%(Why)]', '; '). A guard either stopped firing on a violation or started rejecting a conforming project." />
+  </Target>
+
+  <!-- ── Determinism ban list ────────────────────────────────────────────
+       BannedSymbols.Determinism.txt is a Roslyn analyzer input, so unlike the
+       target-based guards above it can only be proven by a real compile: an
+       entry with a typo, a wrong `P:`/`M:`/`T:` prefix or an unresolvable
+       symbol is silently inert, and evaluating a target would not notice.
+       These three probes are therefore built rather than evaluated, which
+       costs a restore and a compile each.
+
+       The third probe is the one that keeps the rule honest. Ordinary
+       applications, tooling and diagnostics read the clock on purpose, so the
+       ban must fire on the boundary and stay off it. A ban that leaked
+       portfolio-wide would be worse than none. -->
+  <Target Name="VerifyDeterminismBanProbes" BeforeTargets="Build">
+    <!-- Negative probe. Asserted per symbol, not by exit code alone: the probe
+         calls four banned APIs, so dropping any one entry from the list would
+         still leave the build failing on the other three and an exit-code-only
+         assertion would not notice. Each entry has to be shown to resolve. -->
+    <Exec Command="dotnet build &quot;$(MSBuildProjectDirectory)/probes/AmbientTime/AmbientTime.csproj&quot; -t:Rebuild -nologo -v:q -nodeReuse:false"
+          IgnoreExitCode="true"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low"
+          ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ExitCode" PropertyName="_AmbientExit" />
+      <Output TaskParameter="ConsoleOutput" ItemName="_AmbientOutput" />
+    </Exec>
+    <PropertyGroup>
+      <_AmbientLog>@(_AmbientOutput, '|')</_AmbientLog>
+    </PropertyGroup>
+    <Error Condition="'$(_AmbientExit)' == '0'"
+           Text="The AmbientTime probe compiled. Ambient date, tick counts and crypto entropy must be rejected inside the deterministic boundary." />
+    <ItemGroup>
+      <_BannedSymbol Include="DateTime.Today" />
+      <_BannedSymbol Include="Environment.TickCount" />
+      <_BannedSymbol Include="Environment.TickCount64" />
+      <_BannedSymbol Include="RandomNumberGenerator" />
+    </ItemGroup>
+    <Error Condition="!$(_AmbientLog.Contains('The symbol %27%(_BannedSymbol.Identity)%27 is banned'))"
+           Text="BannedSymbols.Determinism.txt did not reject %(_BannedSymbol.Identity) in the AmbientTime probe. Its entry is missing, misspelled, or carries the wrong P:/M:/T: prefix — all of which leave it silently inert." />
+
+    <!-- Positive probes. The second is the one that keeps the rule honest:
+         ordinary applications, tooling and diagnostics read the clock on
+         purpose, so the ban must fire on the boundary and stay off it. -->
+    <ItemGroup>
+      <_CleanBanProbe Include="InjectedTime">
+        <Why>the deterministic boundary taking time and randomness through explicit parameters</Why>
+      </_CleanBanProbe>
+      <_CleanBanProbe Include="AmbientOffBoundary">
+        <Why>the same ambient calls in a project that never opted in</Why>
+      </_CleanBanProbe>
+    </ItemGroup>
+    <Exec Command="dotnet build &quot;$(MSBuildProjectDirectory)/probes/%(_CleanBanProbe.Identity)/%(_CleanBanProbe.Identity).csproj&quot; -t:Rebuild -nologo -v:q -nodeReuse:false"
+          IgnoreExitCode="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low"
+          ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ExitCode" ItemName="_CleanBanResult" />
+    </Exec>
+    <PropertyGroup>
+      <_CleanBanResults>@(_CleanBanResult, ',')</_CleanBanResults>
+    </PropertyGroup>
+    <Error Condition="'$(_CleanBanResults)' != '0,0'"
+           Text="Determinism ban probe outcomes were '$(_CleanBanResults)', expected '0,0' for: @(_CleanBanProbe->'%(Identity) [%(Why)]', '; '). The ban is rejecting injected time or leaking into code that never opted in." />
   </Target>
 
   <!-- ── Engine boundary ─────────────────────────────────────────────────── -->

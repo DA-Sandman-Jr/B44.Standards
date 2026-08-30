@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Positive probe: the same deterministic boundary, taking time and
+       randomness through explicit parameters. A ban that rejected this would
+       reject the pattern it exists to steer callers towards. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <B44Deterministic>true</B44Deterministic>
+  </PropertyGroup>
+</Project>

@@ -5,3 +5,7 @@ P:System.DateTimeOffset.UtcNow;Inject the BCL TimeProvider and read GetUtcNow()
 M:System.Random.#ctor;Inject an explicit random source (the games use B44.Common.Interfaces.IRandomSource) — ambient RNG breaks deterministic tests
 M:System.Random.#ctor(System.Int32);Inject an explicit random source and pass the seed to it
 P:System.Random.Shared;Inject an explicit random source — shared ambient RNG breaks deterministic tests
+P:System.DateTime.Today;Inject the BCL TimeProvider and read GetUtcNow() — ambient local date is DateTime.Now with the time discarded
+P:System.Environment.TickCount;Inject the BCL TimeProvider — an ambient monotonic counter is not replayable, and it wraps
+P:System.Environment.TickCount64;Inject the BCL TimeProvider — an ambient monotonic counter is not replayable
+T:System.Security.Cryptography.RandomNumberGenerator;Inject an explicit random source (the games use B44.Common.Interfaces.IRandomSource) — crypto entropy cannot be seeded, so nothing that reads it can be replayed

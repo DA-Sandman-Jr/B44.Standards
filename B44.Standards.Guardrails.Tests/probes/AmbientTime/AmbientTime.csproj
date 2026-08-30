@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Negative probe: ambient time and entropy inside a project that declares
+       the deterministic boundary. Every call here must be rejected by
+       BannedSymbols.Determinism.txt. Built, not just evaluated: the ban is a
+       Roslyn analyzer, so only a compile can prove it fires. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <B44Deterministic>true</B44Deterministic>
+  </PropertyGroup>
+</Project>
