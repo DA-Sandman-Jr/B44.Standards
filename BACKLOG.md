@@ -383,10 +383,10 @@ on the boundary too — with zero `RS0030` and zero build failures.
 `TimeProvider.System` uses are unaffected either way, since that API was not
 banned.
 
-**Coordination.** Enforcement expands, so this sits at 0.14.0 on `main`,
-untagged and unpublished, and no consumer has been migrated. The documented
-consumer boundary stays `0.13.*` until someone decides to release; publishing
-0.14.0 is what moves it.
+**Released** as 0.14.0 on 2026-08-30. The documented consumer boundary and the
+template defaults moved to `0.14.*` with it. No consumer has been migrated:
+every repository still floats `0.12.*` and crosses to `0.14.*` deliberately,
+which is when these four entries begin applying to it.
 
 ### Public API manifests: measured and declined
 
