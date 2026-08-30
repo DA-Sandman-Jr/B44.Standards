@@ -56,8 +56,9 @@ asserts both detection and build failure.
   The build rejects a list that does not exist, and one whose name the analyzer
   will never match — both of which are otherwise silently inert.
 - **Orphaned sidecars.** A tracked `.uid` or `.import` whose principal file is
-  not tracked is debris; every live one must stay committed. Decidable from the
-  tracked file list alone, with no engine knowledge.
+  not tracked is debris; a live one stays committed, and a file with no sidecar
+  is never reported. Decidable from the tracked file list alone, with no engine
+  knowledge.
 - **Consumer runsettings that drop the zero-tests floor** (`B44T003`, a
   warning).
 
@@ -77,15 +78,23 @@ which is why that check is opt-in rather than always on.
   list, `B44BannedSymbols` now enforces it; where it cannot, it belongs in that
   repository's own architecture tests. Standards does not cap API size, does
   not internalize APIs by caller count, and does not infer boundaries.
-- **Missing Godot `.uid` sidecars.** A new `.cs` committed before the editor
-  regenerated its sidecar is a real, recurring failure, but detecting it needs
-  the Godot project root and the knowledge that generation requires opening the
-  editor — engine-specific, and UIDs must never be fabricated outside Godot to
-  satisfy a check. **Delivered in B44.Godot** on 2026-08-26 as
-  `reusable-godot-uid-check.yml`, which reports tracked scripts with no
-  committed sidecar and never writes one. The general half — orphaned sidecars,
-  which need no engine knowledge — shipped here instead, and found seven in
-  WhispersOfTheEarth on its first real run.
+- **Missing Godot `.uid` sidecars.** Not a defect, and no longer checked
+  anywhere. Only Godot allocates a UID, so an absent sidecar means the editor
+  has not run over that script yet — a normal state that no build or CI job can
+  resolve, and one a check could only turn into workflow debt: a red build whose
+  single remedy is opening the editor, or a fabricated value that looks
+  authoritative and resolves to nothing. B44.Godot's
+  `reusable-godot-uid-check.yml` enforced this from 2026-08-26 and was **deleted
+  on 2026-08-29** without ever being adopted by a game. The half that stayed is
+  the half that needs no engine knowledge: orphaned sidecars, which shipped here
+  and found seven in WhispersOfTheEarth on its first real run.
+
+  Content validation of a `.uid` was considered and rejected in the same pass.
+  Everything beyond the orphan check — an empty or malformed file, a duplicated
+  UID value — needs the file's bytes rather than the tracked path list, plus a
+  claim about Godot's UID grammar and uniqueness rules that this repository
+  cannot verify and that Godot may change. Orphan detection is where the
+  mechanically decidable part ends.
 
 #### Rejected in this pass
 

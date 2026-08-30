@@ -239,15 +239,19 @@
   <Target Name="VerifyRepositoryHygieneFixture" BeforeTargets="Build">
     <ItemGroup>
       <!-- Files that MUST stay clean. The .uid entry is the important one:
-           organization guidance requires committing every Godot .uid sidecar,
-           so a hygiene rule that flags them would be actively harmful. The
-           .obj entry is a Wavefront model, not a build directory, and
-           Packages/manifest.json is Unity's tracked package manifest. -->
+           Godot .uid sidecars are committed on purpose, so a hygiene rule that
+           flags them would be actively harmful. The .obj entry is a Wavefront
+           model, not a build directory, and Packages/manifest.json is Unity's
+           tracked package manifest. -->
       <_CleanTrackedFile Include="src/Game.cs" />
       <_CleanTrackedFile Include="Scenes/Player.tscn" />
       <_CleanTrackedFile Include="Scenes/Player.cs" />
       <_CleanTrackedFile Include="Scenes/Player.cs.uid" />
       <_CleanTrackedFile Include="Scenes/Player.tscn.import" />
+      <!-- A script Godot has not written a sidecar for yet. Missing sidecars
+           are not defects and nothing here may report one: only Godot
+           allocates a UID, and a build cannot fabricate one. -->
+      <_CleanTrackedFile Include="Scenes/Enemy.cs" />
       <_CleanTrackedFile Include="Packages/manifest.json" />
       <_CleanTrackedFile Include="Art/model.obj" />
       <_CleanTrackedFile Include="README.md" />
@@ -258,7 +262,7 @@
       <Output TaskParameter="ViolationCount" PropertyName="_CleanHygieneViolations" />
     </B44RepositoryHygieneTask>
     <Error Condition="'$(_CleanHygieneViolations)' != '0'"
-           Text="A clean tracked-file set reported $(_CleanHygieneViolations) hygiene violation(s). Committed Godot .uid sidecars, Wavefront .obj models and Unity package manifests must never be flagged." />
+           Text="A clean tracked-file set reported $(_CleanHygieneViolations) hygiene violation(s). Committed Godot .uid sidecars, a script with no sidecar yet, Wavefront .obj models and Unity package manifests must never be flagged." />
 
     <ItemGroup>
       <_DirtyTrackedFile Include="bin/Debug/net8.0/App.dll" />
@@ -276,13 +280,16 @@
       <_DirtyTrackedFile Include="~$Design.docx" />
       <_DirtyTrackedFile Include="docs/Screenshot 2026-08-01.png" />
       <_DirtyTrackedFile Include="tools/helper.exe" />
-      <!-- An orphaned sidecar: the script it identifies is gone, so the file
-           left behind describes nothing. Committing every LIVE .uid is
-           required; keeping a dead one is the mistake. -->
+      <!-- Orphaned sidecars, both families: the file each one identifies is
+           gone, so what is left behind describes nothing. A LIVE sidecar stays
+           committed; keeping a dead one is the mistake. -->
       <_DirtyTrackedFile Include="Scenes/Removed.cs.uid" />
+      <_DirtyTrackedFile Include="Scenes/Removed.tscn.import" />
       <!-- Clean entries mixed in: a rule that flags everything proves nothing.
-           Player.cs is tracked, so its sidecars are correctly paired. -->
+           Player.cs is tracked, so its sidecars are correctly paired, and
+           Enemy.cs has no sidecar at all, which is not a violation. -->
       <_DirtyTrackedFile Include="src/Game.cs" />
+      <_DirtyTrackedFile Include="Scenes/Enemy.cs" />
       <_DirtyTrackedFile Include="Scenes/Player.cs" />
       <_DirtyTrackedFile Include="Scenes/Player.cs.uid" />
       <_DirtyTrackedFile Include="Scenes/Player.tscn" />
@@ -292,8 +299,31 @@
                               FailOnViolation="false">
       <Output TaskParameter="ViolationCount" PropertyName="_DirtyHygieneViolations" />
     </B44RepositoryHygieneTask>
-    <Error Condition="'$(_DirtyHygieneViolations)' != '16'"
-           Text="Expected 16 hygiene violations across the debris classes; got '$(_DirtyHygieneViolations)'. A debris class is no longer detected, or a clean file was flagged." />
+    <Error Condition="'$(_DirtyHygieneViolations)' != '17'"
+           Text="Expected 17 hygiene violations across the debris classes; got '$(_DirtyHygieneViolations)'. A debris class is no longer detected, or a clean file was flagged." />
+
+    <!-- Sidecars on their own, away from the other debris classes: a paired
+         sidecar and a principal with none at all pass, and only the two
+         orphans are reported. The gate below proves an orphan alone is enough
+         to fail a build. -->
+    <ItemGroup>
+      <_SidecarTrackedFile Include="Scenes/Player.cs" />
+      <_SidecarTrackedFile Include="Scenes/Player.cs.uid" />
+      <_SidecarTrackedFile Include="Scenes/Enemy.cs" />
+      <_SidecarTrackedFile Include="Scenes/Removed.cs.uid" />
+      <_SidecarTrackedFile Include="Scenes/Removed.tscn.import" />
+    </ItemGroup>
+    <B44RepositoryHygieneTask TrackedFiles="@(_SidecarTrackedFile)" CheckBinaries="true"
+                              FailOnViolation="false">
+      <Output TaskParameter="ViolationCount" PropertyName="_SidecarHygieneViolations" />
+    </B44RepositoryHygieneTask>
+    <Error Condition="'$(_SidecarHygieneViolations)' != '2'"
+           Text="Expected exactly the two orphaned sidecars; got '$(_SidecarHygieneViolations)'. Either an orphan is no longer detected, or a paired sidecar or a script with no sidecar was wrongly flagged." />
+
+    <B44RepositoryHygieneTask TrackedFiles="@(_SidecarTrackedFile)" CheckBinaries="true"
+                              FailOnViolation="true" ContinueOnError="true" />
+    <Error Condition="'$(MSBuildLastTaskResult)' == 'true'"
+           Text="An orphaned sidecar did not fail the repository hygiene task on its own." />
 
     <!-- Repositories that commit native plugins on purpose turn the binary
          family off wholesale, or exempt exact paths. -->

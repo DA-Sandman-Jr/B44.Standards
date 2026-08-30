@@ -90,8 +90,9 @@ Opt-in, one line each in `Directory.Build.props`:
   archives, and sidecars left behind by a file that no longer exists (a `.uid`
   or `.import` whose principal is untracked). Live Godot `.uid` and `.import`
   sidecars, Wavefront `.obj` models and Unity's `Packages/manifest.json` are
-  never flagged — committing every live sidecar is required, and only a dead
-  one is debris. Exempt paths
+  never flagged — a live sidecar is committed on purpose and only a dead one is
+  debris. A file with no sidecar is never reported either: only Godot allocates
+  a UID, so an absent one is a normal state and not a defect. Exempt paths
   with `<B44HygieneAllow>tools/*.exe;native/libfoo.so</B44HygieneAllow>`, or
   turn the binary family off entirely with `B44HygieneBinaries=false`. Anchor
   and repository root default to the ratchet's.

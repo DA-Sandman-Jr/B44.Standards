@@ -43,7 +43,7 @@
         // Generated build output, engine and tool caches. "packages" is
         // deliberately absent: Unity's Packages/manifest.json is a tracked
         // source file. So is every *.uid Godot writes beside a script, and no
-        // rule below matches one — committing them is required, not debris.
+        // rule below matches one — they are committed on purpose, not debris.
         var directories = new System.Collections.Generic.HashSet<string>(
             new[]
             {
@@ -83,11 +83,14 @@
 
         // Sidecar extensions: a file that exists only to describe the file it
         // sits beside, and is meaningless without it. Godot writes .uid beside
-        // every script and resource and .import beside every imported asset;
-        // both must be committed, and both are left behind when the file they
-        // describe is deleted or renamed without them. Whether the principal
-        // file is tracked is decidable from this list alone — no engine
-        // knowledge and no filesystem access.
+        // a script or resource and .import beside an imported asset; both are
+        // committed when they exist, and both are left behind when the file
+        // they describe is deleted or renamed without them. Only that orphan is
+        // checked here. A file with no sidecar is never a violation: Godot
+        // allocates UIDs, so an absent one means the editor has not run yet,
+        // which is a normal state and not something a build can fix. Whether
+        // the principal file is tracked is decidable from this list alone — no
+        // engine knowledge and no filesystem access.
         var sidecarExtensions = new System.Collections.Generic.HashSet<string>(
             new[] { ".uid", ".import" },
             System.StringComparer.OrdinalIgnoreCase);
@@ -117,9 +120,9 @@
                         ". Delete it; it describes a file that no longer exists.");
                 }
 
-                // A sidecar is never debris on its own account. Committing every
-                // one of them is required, not optional: without them references
-                // break on the next fresh clone, CI runners included.
+                // A live sidecar is never debris on its own account: it is
+                // committed on purpose, because without it references break on
+                // the next fresh clone, CI runners included.
                 continue;
             }
 
