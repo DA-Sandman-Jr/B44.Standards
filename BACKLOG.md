@@ -223,6 +223,38 @@ findings waiting for them:
   Moving the tested logic into `Whispers.Core` is the fix; enabling the flag
   first would only turn the build red.
 
+### An anchorless repository-wide check now fails instead of passing green
+
+**Status:** **Done** on 2026-08-30, in 0.13.0. Found while enabling the opt-in
+guardrails in `Continuity`.
+
+The ratchet, repository hygiene, and the suppression budget each run once per
+build by comparing an anchor project against the project being built. That is
+how "once" is achieved, and it is also how the check disappears: if the anchor
+is empty, the comparison matches no project and the target never runs. A
+repository that enabled hygiene and a budget got a green build that had checked
+nothing, with no message saying so.
+
+`Continuity` was in exactly that state. It sets `B44HygieneProject` from
+`B44RatchetProject`, which is what the default does, but it does not run the
+ratchet — so the anchor was empty and both checks were inert. It surfaced only
+because the budget was seeded one under the real count on purpose and nothing
+failed.
+
+Now `B44H003` (hygiene or budget, no anchor), `B44H004` (anchor names a file
+that does not exist), `B44R002` and `B44R003` (the same two for the ratchet).
+Reported from every project that sees the opt-in, because with no anchor there
+is no single project to report from. Off with `B44VerifyHygieneAnchor=false` or
+`B44VerifyRatchetAnchor=false`.
+
+Not decidable, and left alone: an anchor naming a real project that is simply
+not in the build. No single project's evaluation can see the rest of the build.
+
+Measured before release: all twelve consumers already set a valid anchor, so
+nothing turns red. `Continuity`, `B44.Common` and `BookshelfReader` — the three
+anchor shapes in use — were rebuilt against the candidate with zero new
+diagnostics.
+
 ### Keep MA0002 enforced in tests
 
 **Status:** **Done** on 2026-08-29. Raised 2026-08-26 during the 0.12.0

@@ -106,8 +106,20 @@ Opt-in, one line each in `Directory.Build.props`:
   `B44AllowedNoWarn` (default `CS1591`; extend with
   `<B44AllowedNoWarn>$(B44AllowedNoWarn);NU5128</B44AllowedNoWarn>`).
 
+Each of the three repository-wide checks — the ratchet, hygiene, and the
+suppression budget — runs once per build from a single anchor project, and
+comparing that anchor against the project being built is how "once" is
+achieved. An anchor that is unset or names a file that does not exist matches
+no project, so the check never runs and the build goes green having verified
+nothing. Enabling one of them in that state is an error (`B44H003`/`B44H004`
+for hygiene and the budget, `B44R002`/`B44R003` for the ratchet), reported from
+every project that sees the opt-in, because with no anchor there is no one
+project to report from. An anchor naming a real project that is simply not part
+of the build stays undetectable — no single project's evaluation can decide it.
+
 Every check has a named property that turns it off (`B44ReferencePolicy`,
-`B44TestProjectIntegrity`, `B44TestRunSettings`, `B44VerifyBannedSymbolGuard`).
+`B44TestProjectIntegrity`, `B44TestRunSettings`, `B44VerifyBannedSymbolGuard`,
+`B44VerifyHygieneAnchor`, `B44VerifyRatchetAnchor`).
 Turning one off is an edit to a reviewed file, not a runtime flag.
 
 Agent guidance synchronization is off unless a repository opts in from its
@@ -130,7 +142,7 @@ Local builds update managed files, while
 
 All B44 repositories, including released and production consumers, reference
 internal packages through a compatibility-bounded float. Pre-1.0 packages use
-`0.<minor>.*` (the current consumer boundary is `0.12.*`); stable packages use
+`0.<minor>.*` (the current consumer boundary is `0.13.*`); stable packages use
 `<major>.*`. Breaking changes bump the excluded minor or major boundary and
 require a deliberate consumer edit. Never use an unbounded `*`. Changes that
 expand Standards enforcement bump the Standards minor version rather than

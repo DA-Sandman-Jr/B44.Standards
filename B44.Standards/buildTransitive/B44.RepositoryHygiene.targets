@@ -16,6 +16,33 @@
     <B44HygieneBinaries Condition="'$(B44HygieneBinaries)' == ''">true</B44HygieneBinaries>
   </PropertyGroup>
 
+  <!-- Both checks below run from a single anchor project, so both conditions
+       compare the anchor against the project being built. If the anchor is
+       empty, that comparison matches no project and the check never runs: a
+       repository that enabled it gets a green build proving nothing, which is
+       the exact false-green these guards exist to prevent. Enabling one
+       without an anchor is therefore an error.
+
+       This target deliberately carries no anchor condition of its own. With no
+       anchor there is no single project to report from, so it reports from
+       every project that sees the opt-in — duplicated on a multi-project build,
+       and correct, which is the right trade for a build that would otherwise
+       verify nothing. Turn it off with B44VerifyHygieneAnchor=false.
+
+       Residual: an anchor naming a real project that is not part of the build
+       is still inert, and no single project's evaluation can decide that. The
+       cheap half — unset, or pointing at nothing — is what is decidable here. -->
+  <Target Name="B44VerifyHygieneAnchor"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(B44VerifyHygieneAnchor)' != 'false' and ('$(B44HygieneEnabled)' == 'true' or '$(B44SuppressionBudget)' != '')">
+    <Error Condition="'$(B44HygieneProject)' == ''"
+           Code="B44H003"
+           Text="B44HygieneEnabled/B44SuppressionBudget need an anchor project, and none is set. B44HygieneProject defaults to B44RatchetProject, which is empty in this repository, so both repository-wide checks would match no project and never run. Set B44HygieneProject (and B44HygieneRepositoryRoot) in Directory.Build.props, or remove the opt-in." />
+    <Error Condition="'$(B44HygieneProject)' != '' and !Exists('$(B44HygieneProjectFullPath)')"
+           Code="B44H004"
+           Text="B44HygieneProject is '$(B44HygieneProject)', which does not exist. The anchor is compared against each project being built, so a path that names nothing matches nothing and both repository-wide checks would never run. Point it at a project that is built in this repository." />
+  </Target>
+
   <UsingTask
     TaskName="B44RepositoryHygieneTask"
     TaskFactory="RoslynCodeTaskFactory"

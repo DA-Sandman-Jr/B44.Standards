@@ -26,6 +26,7 @@
          actually passing negative tests. -->
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44E001;B44H002;B44S001;B44S002</MSBuildWarningsAsMessages>
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44T001;B44T002;B44P002;B44P003;B44W001;B44W006;B44E004;B44E005;B44T003</MSBuildWarningsAsMessages>
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44H003;B44H004;B44R002;B44R003</MSBuildWarningsAsMessages>
   </PropertyGroup>
 
   <!-- ── Target-based guards ─────────────────────────────────────────────────
@@ -103,6 +104,30 @@
         <Args>-warnaserror:B44T003</Args>
         <Why>a consumer runsettings that keeps the floor</Why>
       </_Probe>
+      <!-- Anchor guards. A repository-wide check runs from one anchor project,
+           so an unset or non-existent anchor matches nothing and the check
+           passes green having verified nothing. These four assert that the
+           inert configuration fails loudly and the valid one still passes. -->
+      <_Probe Include="AnchorlessHygiene">
+        <VerifyTarget>B44VerifyHygieneAnchor</VerifyTarget>
+        <Why>repository hygiene enabled with no anchor project</Why>
+      </_Probe>
+      <_Probe Include="AnchorlessBudget">
+        <VerifyTarget>B44VerifyHygieneAnchor</VerifyTarget>
+        <Why>a suppression budget with no anchor project, hygiene off</Why>
+      </_Probe>
+      <_Probe Include="AbsentAnchor">
+        <VerifyTarget>B44VerifyHygieneAnchor</VerifyTarget>
+        <Why>an anchor naming a project that does not exist</Why>
+      </_Probe>
+      <_Probe Include="AnchoredHygiene">
+        <VerifyTarget>B44VerifyHygieneAnchor</VerifyTarget>
+        <Why>hygiene and a budget correctly anchored on an existing project</Why>
+      </_Probe>
+      <_Probe Include="AnchorlessRatchet">
+        <VerifyTarget>B44VerifyRatchetAnchor</VerifyTarget>
+        <Why>the source-size ratchet enabled with no anchor project</Why>
+      </_Probe>
     </ItemGroup>
 
     <!-- Batched over @(_Probe): one Exec per probe. Forward slashes because an
@@ -119,7 +144,7 @@
     <!-- Exec batching yields one _ProbeResult per probe, in item order. -->
     <PropertyGroup>
       <_ProbeResults>@(_ProbeResult, ',')</_ProbeResults>
-      <_ExpectedResults>1,1,0,1,1,1,1,0,1,1,0,1,0</_ExpectedResults>
+      <_ExpectedResults>1,1,0,1,1,1,1,0,1,1,0,1,0,1,1,1,0,1</_ExpectedResults>
     </PropertyGroup>
     <Error Condition="'$(_ProbeResults)' != '$(_ExpectedResults)'"
            Text="Project-policy probe outcomes were '$(_ProbeResults)', expected '$(_ExpectedResults)' (0 = target passed, 1 = target failed) for: @(_Probe->'%(Identity) [%(Why)]', '; '). A guard either stopped firing on a violation or started rejecting a conforming project." />

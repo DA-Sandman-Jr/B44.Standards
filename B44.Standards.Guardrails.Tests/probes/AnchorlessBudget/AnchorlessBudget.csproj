@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Negative probe: a suppression budget with no anchor project. Hygiene is
+       off, so this proves the budget alone is enough to require an anchor.
+       Never built; see ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <B44RatchetProject></B44RatchetProject>
+    <B44HygieneProject></B44HygieneProject>
+    <B44HygieneEnabled>false</B44HygieneEnabled>
+    <B44SuppressionBudget>0</B44SuppressionBudget>
+  </PropertyGroup>
+</Project>

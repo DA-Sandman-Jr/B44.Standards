@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Positive probe: hygiene and a budget anchored on a project that exists.
+       A guard that rejected this would break every conforming consumer.
+       Never built; see ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <B44RatchetProject></B44RatchetProject>
+    <B44HygieneProject>$(MSBuildProjectFullPath)</B44HygieneProject>
+    <B44HygieneRepositoryRoot>$(MSBuildThisFileDirectory)</B44HygieneRepositoryRoot>
+    <B44HygieneEnabled>true</B44HygieneEnabled>
+    <B44SuppressionBudget>0</B44SuppressionBudget>
+  </PropertyGroup>
+</Project>

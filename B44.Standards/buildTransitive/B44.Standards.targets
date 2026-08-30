@@ -624,6 +624,23 @@
     </Task>
   </UsingTask>
 
+  <!-- Same anchor hazard as the hygiene checks, in the check they inherit
+       their anchor from: B44VerifyRatchet compares B44RatchetProject against
+       the project being built, so an empty anchor matches nothing and the
+       ratchet silently never runs. Reported from every project rather than
+       from an anchor that by definition is not there. Turn it off with
+       B44VerifyRatchetAnchor=false. -->
+  <Target Name="B44VerifyRatchetAnchor"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(B44VerifyRatchetAnchor)' != 'false' and '$(B44RatchetEnabled)' == 'true'">
+    <Error Condition="'$(B44RatchetProject)' == ''"
+           Code="B44R002"
+           Text="B44RatchetEnabled is true but B44RatchetProject is empty, so the ratchet would match no project and never run. Set it in Directory.Build.props to the project that anchors the once-per-build checks, or remove B44RatchetEnabled." />
+    <Error Condition="'$(B44RatchetProject)' != '' and !Exists('$(B44RatchetProjectFullPath)')"
+           Code="B44R003"
+           Text="B44RatchetProject is '$(B44RatchetProject)', which does not exist, so the ratchet would match no project and never run. Point it at a project that is built in this repository." />
+  </Target>
+
   <Target Name="B44VerifyRatchet"
           BeforeTargets="PrepareForBuild"
           Condition="'$(B44RatchetEnabled)' == 'true' and '$(B44RatchetProjectFullPath)' == '$(MSBuildProjectFullPath)'">

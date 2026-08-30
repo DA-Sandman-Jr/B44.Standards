@@ -21,7 +21,7 @@ The repository publishes two packages:
 Reference the package privately so policy assets affect the build without becoming a runtime dependency:
 
 ```xml
-<PackageReference Include="B44.Standards" Version="0.12.*" PrivateAssets="all" />
+<PackageReference Include="B44.Standards" Version="0.13.*" PrivateAssets="all" />
 ```
 
 The package is conservative by default. Repositories opt into stronger profiles through MSBuild properties such as `B44Deterministic`, `B44EngineFree`, `B44EngineFreeCore`, `B44SecuritySensitive`, `B44RatchetEnabled`, `B44HygieneEnabled`, `B44SuppressionBudget`, `B44WarningPolicy`, and `B44AgentSyncEnabled`. See the [package documentation](B44.Standards/README.md) for configuration details.

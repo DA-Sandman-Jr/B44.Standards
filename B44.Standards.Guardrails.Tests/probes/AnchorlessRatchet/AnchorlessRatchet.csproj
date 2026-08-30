@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Negative probe: the source-size ratchet enabled with no anchor project.
+       It is the anchor the hygiene checks default to, and it fails the same
+       way. Never built; see ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <B44RatchetEnabled>true</B44RatchetEnabled>
+    <B44RatchetProject></B44RatchetProject>
+    <B44HygieneEnabled>false</B44HygieneEnabled>
+    <B44SuppressionBudget></B44SuppressionBudget>
+  </PropertyGroup>
+</Project>

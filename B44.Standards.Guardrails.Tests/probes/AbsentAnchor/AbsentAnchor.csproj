@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Negative probe: an anchor that names a project which does not exist. A
+       typo is as inert as an empty anchor. Never built; see ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <B44RatchetProject></B44RatchetProject>
+    <B44HygieneProject>$(MSBuildThisFileDirectory)NoSuchProject.csproj</B44HygieneProject>
+    <B44HygieneEnabled>true</B44HygieneEnabled>
+    <B44SuppressionBudget></B44SuppressionBudget>
+  </PropertyGroup>
+</Project>

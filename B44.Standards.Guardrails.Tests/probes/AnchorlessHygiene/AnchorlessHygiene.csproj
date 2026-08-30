@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Negative probe: repository hygiene enabled with no anchor project. The
+       check would match no project and pass green having verified nothing.
+       Never built; see ../README.md. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <B44RatchetProject></B44RatchetProject>
+    <B44HygieneProject></B44HygieneProject>
+    <B44HygieneEnabled>true</B44HygieneEnabled>
+    <B44SuppressionBudget></B44SuppressionBudget>
+  </PropertyGroup>
+</Project>
