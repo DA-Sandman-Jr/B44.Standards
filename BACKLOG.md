@@ -370,10 +370,12 @@ zero build failures. Nothing changes for any consumer today, because all of them
 are on `Recommended` already; what changes is that none of them can lose the
 family by accident.
 
-**Coordination.** A configuration that used to pass can now fail, so enforcement
-formally expands and this sits at 0.15.0 on `main`, untagged and unpublished,
-with no consumer migrated. Consumers are still on `0.12.*`, with `0.13.0` and
-`0.14.0` already published ahead of them.
+**Released** as 0.15.0 on 2026-08-30; the documented consumer boundary and the
+template defaults moved to `0.15.*` with it. No consumer has been migrated. The
+agreed next step is a single deliberate portfolio migration from `0.12.*`
+straight to `0.15.*`, taking the anchor guards (0.13.0), the determinism
+entries (0.14.0) and this change together rather than crossing three minors one
+at a time. All three were measured as zero-impact on every active consumer.
 
 ### Ambient determinism: what the boundary already holds
 

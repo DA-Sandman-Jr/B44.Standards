@@ -142,7 +142,7 @@ Local builds update managed files, while
 
 All B44 repositories, including released and production consumers, reference
 internal packages through a compatibility-bounded float. Pre-1.0 packages use
-`0.<minor>.*` (the current consumer boundary is `0.14.*`); stable packages use
+`0.<minor>.*` (the current consumer boundary is `0.15.*`); stable packages use
 `<major>.*`. Breaking changes bump the excluded minor or major boundary and
 require a deliberate consumer edit. Never use an unbounded `*`. Changes that
 expand Standards enforcement bump the Standards minor version rather than
