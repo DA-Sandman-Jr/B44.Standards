@@ -191,9 +191,9 @@ whether a design abstraction is justified. Those remain semantic decisions.
 
 ### Retrofit the 0.12.0 guardrails into existing consumers
 
-**Status:** **Done** on 2026-08-26, except `Continuity`, which is blocked on the
-MA0002 decision above. Eleven of twelve consumers are on `0.12.*` and green;
-what follows is the record of what the rollout found.
+**Status:** **Done** on 2026-08-26; `Continuity` followed on 2026-08-29 once
+the MA0002 decision below was made. All twelve consumers are on the `0.12.*`
+line and green; what follows is the record of what the rollout found.
 
 The always-on checks arrive with the float boundary and need no consumer work.
 The opt-in ones do, one line each per repository, and two repositories have real
@@ -225,29 +225,36 @@ findings waiting for them:
   Moving the tested logic into `Whispers.Core` is the fix; enabling the flag
   first would only turn the build red.
 
-### Decide whether MA0002 belongs in the test severity overlay
+### Keep MA0002 enforced in tests
 
-**Status:** **Planned** since 2026-08-26, found during the 0.12.0 consumer rollout.
+**Status:** **Done** on 2026-08-29. Raised 2026-08-26 during the 0.12.0
+consumer rollout.
 
 Standards 0.10.x moved Meziantou.Analyzer from 3.0.123 to 3.0.138, which
 widened MA0002 to xunit's `Assert.Contains(string, IEnumerable<string>)`
 overloads. Eleven of the twelve consumers never noticed, because their test
-suites do not use that pattern. `Continuity` does: crossing from `0.6.*` to
-`0.12.*` raises 50 MA0002 diagnostics across 25 call sites in nine test files,
-and it is the only repository that could not adopt 0.12.0.
+suites do not use that pattern. `Continuity` did: crossing from `0.6.*` to
+`0.12.*` raised MA0002 at 25 call sites across nine test files, and it was the
+only repository that could not adopt 0.12.0.
 
-Every one of those call sites is an assertion comparing string literals, where
-the default comparer is already ordinal. The fix at each site is mechanical and
-behaviour-neutral, which is exactly what makes 25 of them the wrong answer: the
-question is whether MA0002 is telling a test suite something worth knowing.
-`B44.Tests.globalconfig` already relaxes CA1707, CA1816 and CA1861 for tests
-on that reasoning.
+**Decided: MA0002 stays enforced in tests.** The overlay is not relaxed and no
+site is suppressed. `B44.Tests.globalconfig` relaxes CA1707, CA1816 and CA1861
+for tests because those rules ask a test suite to look like production API
+surface, which is not a property tests should have. MA0002 is a different kind
+of rule: it asks what a string comparison means, and a test asserting an
+identity has exactly the same stake in that answer as the code producing it.
+Twenty-five mechanical edits is a migration cost paid once, not a reason to
+stop asking.
 
-Decide one of: relax MA0002 in the test overlay (a patch, since it narrows
-enforcement); leave it and accept the migration in the one repository that
-hits it; or narrow it some other way. Whichever way it goes, `Continuity`
-adopts 0.12.0 immediately afterwards — its two real defects are already fixed
-and merged, and it is green on `0.6.*`.
+`Continuity` adopted `0.12.*` the same day and is green. All 25 sites turned
+out to be ordinal — content-hash ids, canon ids, predicate and language names,
+parsed CLI tokens, semantics versions — so each took an explicit
+`StringComparer.Ordinal` and no behaviour changed. None wanted culture-sensitive
+or case-insensitive semantics, which is the outcome that would have argued for
+relaxing the rule instead. Every consumer is now on the `0.12.*` line.
+
+Earlier notes here put the count at 50 diagnostics; that was one build's output
+counted twice. It is 25 sites and 25 diagnostics.
 
 This also records a gap in how that analyzer bump was measured: the hard rule
 is to measure an analyzer upgrade against every active consumer before
