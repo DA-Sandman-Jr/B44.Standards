@@ -84,3 +84,20 @@ dotnet_diagnostic.MA0040.severity = warning
 dotnet_diagnostic.MA0051.severity = suggestion
 MA0051.maximum_lines_per_method = 60
 MA0051.maximum_statements_per_method = 40
+
+# ── Writable static state ──────────────────────────────────────────────────
+# CA2211 (non-constant fields should not be visible) rejects an externally
+# visible static field that is neither const nor readonly — shared mutable
+# state any caller can reassign, with no owner and no ordering.
+#
+# Pinned for the same reason as the culture family above: the rule is NOT in
+# the SDK's Default analysis mode. It ships enabled only from Minimum upward,
+# so a consumer that sets AnalysisMode=Default loses it in silence, and
+# B44W004 does not object because it rejects only None and AllDisabledByDefault.
+#
+# Severity is warning, matching Recommended; consumers make it an error. Zero
+# such fields exist across the portfolio today, so this pins a clean state
+# rather than widening one. It deliberately stops at externally visible fields:
+# private static caches, lazily-assigned service holders and scene-lifetime
+# singletons are outside its reach and are a design judgement, not a rule.
+dotnet_diagnostic.CA2211.severity = warning

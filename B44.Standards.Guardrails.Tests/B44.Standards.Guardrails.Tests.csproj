@@ -26,7 +26,7 @@
          actually passing negative tests. -->
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44E001;B44H002;B44S001;B44S002</MSBuildWarningsAsMessages>
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44T001;B44T002;B44P002;B44P003;B44W001;B44W006;B44E004;B44E005;B44T003</MSBuildWarningsAsMessages>
-    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44H003;B44H004;B44R002;B44R003;RS0030;CA1304;CA1305;CA1309;CA1310;CA1311</MSBuildWarningsAsMessages>
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);B44H003;B44H004;B44R002;B44R003;RS0030;CA1304;CA1305;CA1309;CA1310;CA1311;CA2211</MSBuildWarningsAsMessages>
   </PropertyGroup>
 
   <!-- ── Target-based guards ─────────────────────────────────────────────────
@@ -275,6 +275,49 @@
     </PropertyGroup>
     <Error Condition="'$(_CleanCultureResults)' != '0,0'"
            Text="Culture probe outcomes were '$(_CleanCultureResults)', expected '0,0' for: @(_CleanCultureProbe->'%(Identity) [%(Why)]', '; '). The pinned rules are rejecting explicit ordinal code, or localized presentation that names its culture." />
+  </Target>
+
+  <!-- ── Writable static state ─────────────────────────────────────
+       CA2211 is the one established analyzer covering shared mutable static
+       state, and like the culture family it is absent from the SDK's Default
+       analysis mode: it ships enabled from Minimum upward only. Both probes set
+       AnalysisMode=Default — the mode under which it would otherwise be off —
+       so these assertions fail the moment the pin is dropped. -->
+  <Target Name="VerifyStaticStateProbes" BeforeTargets="Build">
+    <Exec Command="dotnet build &quot;$(MSBuildProjectDirectory)/probes/StaticVisibleState/StaticVisibleState.csproj&quot; -t:Rebuild -nologo -v:q -nodeReuse:false"
+          IgnoreExitCode="true"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low"
+          ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ExitCode" PropertyName="_StaticStateExit" />
+      <Output TaskParameter="ConsoleOutput" ItemName="_StaticStateOutput" />
+    </Exec>
+    <PropertyGroup>
+      <_StaticStateLog>@(_StaticStateOutput, '|')</_StaticStateLog>
+    </PropertyGroup>
+    <Error Condition="'$(_StaticStateExit)' == '0'"
+           Text="The StaticVisibleState probe compiled. An externally visible static field that is neither const nor readonly is shared mutable state with no owner and no ordering, and must be rejected." />
+    <!-- By code, not by exit code: any other diagnostic would also fail the
+         probe, and an exit-code-only assertion would not notice that CA2211
+         itself had stopped firing. -->
+    <Error Condition="!$(_StaticStateLog.Contains('CA2211'))"
+           Text="CA2211 did not fire in the StaticVisibleState probe, which declares visible non-constant static fields. Its severity is no longer pinned in B44.globalconfig, so it is off wherever AnalysisMode is Default." />
+
+    <!-- Positive probe. This is what keeps the pin honest: CA2211 asks for an
+         owner, not for the absence of static state, so constants, readonly
+         statics and a private field behind its type's own accessor all have to
+         keep compiling. The private field is also the boundary itself — the
+         rule stops there, and what lies beyond is a design judgement. -->
+    <Exec Command="dotnet build &quot;$(MSBuildProjectDirectory)/probes/StaticOwnedState/StaticOwnedState.csproj&quot; -t:Rebuild -nologo -v:q -nodeReuse:false"
+          IgnoreExitCode="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low"
+          ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ExitCode" PropertyName="_StaticOwnedExit" />
+    </Exec>
+    <Error Condition="'$(_StaticOwnedExit)' != '0'"
+           Text="The StaticOwnedState probe failed. The pin is rejecting shared constants, readonly statics, or static state an owning type exposes behind its own accessor." />
   </Target>
 
   <!-- ── Engine boundary ─────────────────────────────────────────────────── -->
