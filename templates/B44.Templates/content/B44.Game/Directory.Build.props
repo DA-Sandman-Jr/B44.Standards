@@ -31,8 +31,12 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 
     <Nullable>enable</Nullable>
-    <!-- Surface editorconfig style/naming violations at build time so CI and
-         local `dotnet build` catch drift instead of waiting for `dotnet format`. -->
+    <!-- Runs the IDE analyzers whose severity the globalconfig or this
+         repository's .editorconfig sets explicitly. It does NOT surface the
+         editorconfig style and naming *options* — a `file_scoped:warning` or a
+         `dotnet_naming_rule` is invisible to `dotnet build` no matter what this
+         property says. The `dotnet format` verification gate in CI is what
+         catches those. -->
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <!-- Required to make IDE0005 (remove unnecessary usings) fire at build time. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

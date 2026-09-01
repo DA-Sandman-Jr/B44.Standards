@@ -8,12 +8,6 @@ Shipped releases and closed evaluations are not open work. They are kept, conden
 
 ## Planned work
 
-### Promote naming and structure conventions to shared guidance
-
-**Status:** **Planned** since 2026-08-07.
-
-Evaluate a small set of conventions for namespaces, source-file organization, tests, test doubles, documentation, and review practices. Before adopting one, decide whether it belongs in prose or analyzer policy, measure any new enforcement against active consumers, and define whether adoption is prospective or retroactive.
-
 ### Release 0.16.0 — pin `CA2211`
 
 **Status:** **Implemented, pending release** as of 2026-09-01. Merged to `main`; not tagged, not published, no consumer migrated. `0.15.1` remains the published boundary and every active consumer floats `0.15.*`; template defaults stay there until this ships.
@@ -22,9 +16,11 @@ Evaluate a small set of conventions for namespaces, source-file organization, te
 
 Measured before release, and a no-op for every consumer as they stand: no consumer sets `AnalysisMode`, so all twelve run `Recommended`, where the rule is already enabled and already an error; there are no `CA2211` suppressions in the portfolio, and a reflection-only scan of 21 first-party assemblies found no field it could fire on. A passing configuration can nevertheless now fail, which is why this is a minor rather than a patch.
 
+The same unreleased minor also carries the naming and structure guidance settled on 2026-09-01 — two `B44.Organization.md` bullets, two stale-prose corrections, and an `.editorconfig` seeded into `B44.Templates`. None of that widens enforcement for an existing consumer; it rides here because `CA2211` already forces the minor.
+
 ### Evaluate the remaining mechanical guardrails
 
-**Status:** **Planned for evaluation** since 2026-08-13. The first implementation pass shipped in 0.12.0, the 2026-08-30 evaluations closed items 2, 3, and 4, and the 2026-09-01 evaluations closed items 6, 7, and 9; what follows is the remainder.
+**Status:** **Planned for evaluation** since 2026-08-13. The first implementation pass shipped in 0.12.0, the 2026-08-30 evaluations closed items 2, 3, and 4, and the 2026-09-01 evaluations closed items 6, 7, and 9; what follows is the remainder. The naming-convention item that 13 and 14 depend on settled on 2026-09-01 and now sits under **Closed decisions and portfolio evidence**, with the convention, the adoption policy, and the portfolio measurements both items were waiting on.
 
 A proposal becomes planned implementation only after its authority is stable, evidence is objective, the owning repository is clear, and enforcement impact has been measured across active consumers. Numbering follows the original review.
 
@@ -53,7 +49,21 @@ Stop adding mechanical rules when the remaining question is whether a concept be
 
 ## Known defects
 
-No known defects are currently queued in this repository.
+### The interface naming rule in ten consumer editorconfigs never fires
+
+**Found 2026-09-01** while measuring naming conventions. Ten of the twelve active consumers carry the same block in their root `.editorconfig`:
+
+```
+dotnet_naming_rule.interfaces_should_start_with_i.severity = error
+dotnet_naming_rule.interfaces_should_start_with_i.symbols = interfaces
+dotnet_naming_rule.interfaces_should_start_with_i.style = interface_style
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_style.interface_style.required_prefix = I
+```
+
+It reads as enforcement at `error` and is inert at both gates. A probe project with `EnforceCodeStyleInBuild=true` and an interface named `Foo` builds clean and passes `dotnet format --verify-no-changes`; adding `dotnet_diagnostic.IDE1006.severity = error` to the same file makes that build fail immediately. A `dotnet_naming_rule`'s own `severity` key does not activate `IDE1006`, and `dotnet format` does not run naming rules at all.
+
+Nothing is mis-named because of it — all 136 interfaces across the twelve consumers are `I`-prefixed — so this is a placebo guardrail rather than a code defect, in the same category as a ban list whose analyzer is missing. The one-line fix belongs to each repository, because turning `IDE1006` on also activates Roslyn's built-in default naming rules over that repository's whole source tree, including its test suite. `B44.Standards` deliberately does not pin it; see the evaluation below.
 
 ## Closed decisions and portfolio evidence
 
@@ -72,6 +82,31 @@ Not open work. Kept so settled questions stay settled, and so the guardrail evid
 ### Consumer rollout — complete
 
 The 0.12.0 retrofit finished on 2026-08-26, with `Continuity` following on 2026-08-29 once the MA0002 decision below was made. The portfolio then crossed from `0.12.*` straight to `0.15.*` in one deliberate migration, taking the anchor guards, the determinism entries, and the pinned culture severities together rather than crossing three minors one at a time. **All twelve active consumers now float `0.15.*`**, with hygiene, suppression budgets, and the warning policy enabled and seeded per repository. `ThemedWeatherImages` remains on `0.6.*` and outside the active set.
+
+### Naming and structure conventions — settled 2026-09-01
+
+The 2026-08-07 item asked for a small set of conventions covering namespaces, source-file organization, tests, test doubles, documentation, and review practice, and for each one to land as prose or as enforcement. Measured over 2,145 non-generated C# files in the twelve active consumers.
+
+**Promoted to shared guidance, as prose.** Two bullets in `B44.Organization.md` describing what the portfolio already does rather than introducing anything new: a file-scoped `namespace` mirroring the folder path beneath the project root, a root namespace equal to the assembly name, `I`-prefixed interfaces, an `Async` suffix on production awaitables, a file named for the type that owns it, XML documentation on the public types of packaged libraries, `*.Tests` projects with `Tests`-suffixed classes, and an explicit statement that test-method phrasing, test-double vocabulary, and folder layout stay repository-local. Adoption is prospective and descriptive; nothing in the portfolio has to change.
+
+**Measurements.** File-scoped namespaces 2,145 of 2,145 (100%). Namespace mirrors folder path 2,138 of 2,145 (99.7%); of the seven exceptions one is an `IsExternalInit` polyfill that must declare `System.Runtime.CompilerServices`, four are Godot smoke runners under a lowercase `tests/` directory, and two are ordinary drift. Interfaces `I`-prefixed 136 of 136 (100%). Production methods returning `Task`/`ValueTask` with an `Async` suffix 74 of 77 (96%); the three exceptions are two `Main` entry points and one protected helper. Files carrying more than one public top-level type: 30 of 2,145 (1.4%), half of them test files grouping related suites. Where a file holds exactly one public type its name matches that type in 446 of 507 (88%) — the 61 exceptions are almost entirely a small companion enum or interface living beside the service it serves. Test projects named `*.Tests`: 22 of 22 (100%). Test classes suffixed `Tests`: 485 of 497 (97.6%). Test-method names carrying at least one underscore: 3,325 of 3,860 (86%), but only 1,165 (30%) are the three-segment `Subject_Scenario_Expectation` shape, and two suites use unbroken sentence names throughout. Test doubles are hand-written almost everywhere: roughly 200 hand-written doubles against 12 `Mock<T>` instances in two files in one repository, split between a suffix vocabulary (`...Fake`, `...Spy`, 87 doubles in one repository) and a prefix vocabulary (`Fake...`, `Stub...`) in the rest. XML documentation on public types: 561 of 562 (99.8%) in the four packaged libraries, 753 of 1,076 (70%) in the applications; at member level the packaged libraries are 2,265 of 2,578 (88%). `README.md` and a root `CLAUDE.md` with its paired `AGENTS.md`: 13 of 13. `BACKLOG.md`: 9 of 13. Pull-request templates: 0 of 13.
+
+**Declined — enforcement.** No analyzer, guard, or severity was added for any of the above.
+
+- *Interface `I` prefix, and naming rules generally.* Compliance is already 100% and an unprefixed interface causes no defect, so this is neatness. Pinning `IDE1006` to make it fire would also switch on Roslyn's built-in default naming rules across every source tree including the test suites, where `CA1707` is off by deliberate decision. The inert rule the consumers already carry is recorded under **Known defects** above and left to each repository.
+- *File-scoped namespaces.* Universal, but already enforced where it belongs: `csharp_style_namespace_declarations = file_scoped:warning` in a repository `.editorconfig`, caught by the `dotnet format --verify-no-changes` gate in the shared CI workflow. It needs no package-level severity, and the standing rule gives an editorconfig that job.
+- *One public type per file, and file-name-equals-type.* `MA0048` stays off; the 88% file-name figure is not a defect rate but the ordinary cost of keeping a companion enum beside its service.
+- *`CS1591`, including a narrower form limited to packable projects.* Would report roughly 313 undocumented members in the packaged libraries on the day it landed.
+- *Unifying test-method phrasing, test-double vocabulary, `Fixtures/` placement, or `src/`+`tests/` versus flat project folders.* Each is internally consistent per repository and none of the variants is wrong; standardizing means a rename that prevents no defect.
+- *A shared pull-request or review template.* Nothing exists to promote — zero of thirteen repositories has one — so this would be a new practice invented at the package layer rather than a convention promoted from evidence.
+
+**Prospective enforcement that did land.** `B44.Templates` now seeds a scaffolded repository with an `.editorconfig`: whitespace and encoding, generated-code markers, `using` ordering, and file-scoped namespaces. New repositories only; no existing consumer is touched. It closes a real gap — the template already sets `EnforceCodeStyleInBuild` and its CI already runs `dotnet format --verify-no-changes`, with no style file for either to read — and it gives the ten hand-copied editorconfigs a canonical origin. It carries no `dotnet_diagnostic` line, and deliberately does not carry the interface naming rule.
+
+**Stale prose corrected.** `B44.Tests.globalconfig` claimed `Method_Scenario_Expectation` was the sanctioned xunit style across every B44 test suite; it is 30% of the portfolio. Both copies of the template `Directory.Build.props` claimed `EnforceCodeStyleInBuild` makes `dotnet build` catch editorconfig style and naming drift; measured false for `IDE0161` and `IDE1006` alike.
+
+**Consumer gaps recorded, not acted on here.** `B44.Godot` and `B44.Unity` have no `.editorconfig` at all. `BookcaseReader`, `Continuity`, and `EthicsAcademy` have no `BACKLOG.md`, which the organization guidance asks for and deliberately does not gate. The ten existing editorconfigs are three semantically distinct copies of one file, and three of them still carry analyzer severities that the standing rule assigns to the packaged globalconfig. Each belongs to its repository's owner.
+
+**Items 13 and 14 are unchanged.** Namespace-to-folder and public-type-to-file enforcement stay open for their own evaluation; this item supplies the convention and the adoption policy they were waiting on, and the measurements above are the starting evidence for whoever takes them up.
 
 ### Evaluated and declined
 

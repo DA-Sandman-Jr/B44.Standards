@@ -1,0 +1,46 @@
+# Style and whitespace for this repository. The template seeds this file once
+# and nothing rewrites it afterwards — it is yours to extend.
+#
+# Analyzer severities do not belong here. They ship in the B44.Standards
+# packaged globalconfig so every repository gets the same policy from one
+# place, and a `dotnet_diagnostic` line in this file is local drift by
+# definition. Style and whitespace are what an editorconfig owns, and that is
+# all this one carries.
+#
+# The gate for everything below is `dotnet format --verify-no-changes`, which
+# the shared CI workflow runs on every push and pull request. Setting
+# EnforceCodeStyleInBuild does not make `dotnet build` report these; the two
+# gates cover different rules.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{csproj,props,targets,slnx,json,yml,yaml,xml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[{**/obj/**,**/bin/**,.godot/**}]
+generated_code = true
+
+[*.{g,generated,designer}.cs]
+generated_code = true
+
+[*.cs]
+indent_size = 4
+
+# File-scoped namespaces. Every C# file in every active B44 repository already
+# declares one; this keeps a new repository on the same side of the default.
+csharp_style_namespace_declarations = file_scoped:warning
+
+# Sort `System.*` usings first, and keep import groups unseparated.
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
