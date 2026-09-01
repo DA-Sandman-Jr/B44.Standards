@@ -11,8 +11,9 @@ That produces a repository that builds, tests, and passes its own gates
 immediately: engine-free Core with `B44EngineFreeCore=true`, an equally
 engine-free xunit.v3 test project (`B44EngineFree=true`), `B44.Standards`
 policy, agent-guidance synchronization, the source-size ratchet, repository
-hygiene, a zero suppression budget, warnings-as-errors, a `BACKLOG.md`, and CI
-wired to the shared reusable workflow. A placeholder type and test exist only
+hygiene, a zero suppression budget, warnings-as-errors, a `BACKLOG.md`, an
+`.editorconfig` seeded with the portfolio's style baseline, and CI wired to the
+shared reusable workflow. A placeholder type and test exist only
 to prove the wiring — delete them with your first real commit.
 
 The template parameter defaults and the `B44.Standards` version publish from

@@ -3,8 +3,11 @@
 is_global = true
 global_level = 200
 
-# Method_Scenario_Expectation underscore naming is the sanctioned xunit style
-# across every B44 test suite.
+# Test-method names carry underscores in most B44 suites — usually
+# Subject_Expectation, sometimes Subject_Scenario_Expectation — and two suites
+# use unbroken sentence names instead. The suffix rule is that there is no
+# rule: phrasing is each repository's own, and CA1707 is off so that neither
+# shape has to argue with an analyzer written for production API surface.
 dotnet_diagnostic.CA1707.severity = none
 # IDisposable ceremony (GC.SuppressFinalize) is noise on sealed test fixtures.
 dotnet_diagnostic.CA1816.severity = none
