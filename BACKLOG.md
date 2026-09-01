@@ -49,21 +49,7 @@ Stop adding mechanical rules when the remaining question is whether a concept be
 
 ## Known defects
 
-### The interface naming rule in ten consumer editorconfigs never fires
-
-**Found 2026-09-01** while measuring naming conventions. Ten of the twelve active consumers carry the same block in their root `.editorconfig`:
-
-```
-dotnet_naming_rule.interfaces_should_start_with_i.severity = error
-dotnet_naming_rule.interfaces_should_start_with_i.symbols = interfaces
-dotnet_naming_rule.interfaces_should_start_with_i.style = interface_style
-dotnet_naming_symbols.interfaces.applicable_kinds = interface
-dotnet_naming_style.interface_style.required_prefix = I
-```
-
-It reads as enforcement at `error` and is inert at both gates. A probe project with `EnforceCodeStyleInBuild=true` and an interface named `Foo` builds clean and passes `dotnet format --verify-no-changes`; adding `dotnet_diagnostic.IDE1006.severity = error` to the same file makes that build fail immediately. A `dotnet_naming_rule`'s own `severity` key does not activate `IDE1006`, and `dotnet format` does not run naming rules at all.
-
-Nothing is mis-named because of it — all 136 interfaces across the twelve consumers are `I`-prefixed — so this is a placebo guardrail rather than a code defect, in the same category as a ban list whose analyzer is missing. The one-line fix belongs to each repository, because turning `IDE1006` on also activates Roslyn's built-in default naming rules over that repository's whole source tree, including its test suite. `B44.Standards` deliberately does not pin it; see the evaluation below.
+No known defects are currently queued in this repository.
 
 ## Closed decisions and portfolio evidence
 
@@ -93,7 +79,7 @@ The 2026-08-07 item asked for a small set of conventions covering namespaces, so
 
 **Declined — enforcement.** No analyzer, guard, or severity was added for any of the above.
 
-- *Interface `I` prefix, and naming rules generally.* Compliance is already 100% and an unprefixed interface causes no defect, so this is neatness. Pinning `IDE1006` to make it fire would also switch on Roslyn's built-in default naming rules across every source tree including the test suites, where `CA1707` is off by deliberate decision. The inert rule the consumers already carry is recorded under **Known defects** above and left to each repository.
+- *Interface `I` prefix, and naming rules generally.* Compliance is already 100% and an unprefixed interface causes no defect, so this is neatness. Pinning `IDE1006` to make it fire would also switch on Roslyn's built-in default naming rules across every source tree including the test suites, where `CA1707` is off by deliberate decision. The inert copy of that rule the consumers already carry is recorded under consumer gaps below; declining enforcement here does not ask any repository to start enforcing it.
 - *File-scoped namespaces.* Universal, but already enforced where it belongs: `csharp_style_namespace_declarations = file_scoped:warning` in a repository `.editorconfig`, caught by the `dotnet format --verify-no-changes` gate in the shared CI workflow. It needs no package-level severity, and the standing rule gives an editorconfig that job.
 - *One public type per file, and file-name-equals-type.* `MA0048` stays off; the 88% file-name figure is not a defect rate but the ordinary cost of keeping a companion enum beside its service.
 - *`CS1591`, including a narrower form limited to packable projects.* Would report roughly 313 undocumented members in the packaged libraries on the day it landed.
@@ -105,6 +91,18 @@ The 2026-08-07 item asked for a small set of conventions covering namespaces, so
 **Stale prose corrected.** `B44.Tests.globalconfig` claimed `Method_Scenario_Expectation` was the sanctioned xunit style across every B44 test suite; it is 30% of the portfolio. Both copies of the template `Directory.Build.props` claimed `EnforceCodeStyleInBuild` makes `dotnet build` catch editorconfig style and naming drift; measured false for `IDE0161` and `IDE1006` alike.
 
 **Consumer gaps recorded, not acted on here.** `B44.Godot` and `B44.Unity` have no `.editorconfig` at all. `BookcaseReader`, `Continuity`, and `EthicsAcademy` have no `BACKLOG.md`, which the organization guidance asks for and deliberately does not gate. The ten existing editorconfigs are three semantically distinct copies of one file, and three of them still carry analyzer severities that the standing rule assigns to the packaged globalconfig. Each belongs to its repository's owner.
+
+Those same ten editorconfigs also carry configuration that reads as enforcement and is not. The block below claims to require an `I` prefix on interfaces, at `error`, and does nothing at either gate:
+
+```
+dotnet_naming_rule.interfaces_should_start_with_i.severity = error
+dotnet_naming_rule.interfaces_should_start_with_i.symbols = interfaces
+dotnet_naming_rule.interfaces_should_start_with_i.style = interface_style
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_style.interface_style.required_prefix = I
+```
+
+A probe project with `EnforceCodeStyleInBuild=true` and an interface named `Foo` builds clean and passes `dotnet format --verify-no-changes`; a `dotnet_naming_rule`'s own `severity` key does not activate `IDE1006`, and `dotnet format` does not run naming rules at all. No code is mis-named because of it — all 136 interfaces across the twelve consumers are `I`-prefixed — so what is recorded here is misleading configuration, not a naming problem and not a defect in this repository. The evaluation above declines to enforce interface naming from `B44.Standards`, and that decision prescribes nothing downstream: a repository may leave the block alone, delete it as dead configuration, or decide locally and separately that it wants naming enforced. None of those is required, and `B44.Standards` will not pin the severity that would make it fire.
 
 **Items 13 and 14 are unchanged.** Namespace-to-folder and public-type-to-file enforcement stay open for their own evaluation; this item supplies the convention and the adoption policy they were waiting on, and the measurements above are the starting evidence for whoever takes them up.
 
