@@ -16,7 +16,7 @@ Evaluate a small set of conventions for namespaces, source-file organization, te
 
 ### Release 0.16.0 — pin `CA2211`
 
-**Status:** **Implemented, pending release** as of 2026-09-01. Committed on a review branch; not tagged, not published, no consumer migrated. `0.15.1` remains the published boundary and every active consumer floats `0.15.*`; template defaults stay there until this ships.
+**Status:** **Implemented, pending release** as of 2026-09-01. Merged to `main`; not tagged, not published, no consumer migrated. `0.15.1` remains the published boundary and every active consumer floats `0.15.*`; template defaults stay there until this ships.
 
 `CA2211` (non-constant fields should not be visible) is pinned explicitly in `B44.globalconfig` at `warning`. Like the culture family in 0.15.0, the rule is absent from the SDK's `Default` analysis mode — it ships enabled from `Minimum` upward only — so a consumer that set `AnalysisMode` for an unrelated reason lost it in silence, and `B44W004` would not object because it rejects only `None` and `AllDisabledByDefault`. Probes at `AnalysisMode=Default` assert both ends: visible non-constant statics are rejected, and constants, readonly statics, and state an owning type exposes behind its own accessor still compile. No new property, mechanism, or check.
 
