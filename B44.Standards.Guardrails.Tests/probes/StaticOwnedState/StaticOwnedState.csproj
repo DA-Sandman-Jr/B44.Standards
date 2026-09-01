@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Positive probe: the forms CA2211 steers callers towards. Also
+       AnalysisMode=Default, so it proves the pin rejects visible mutable
+       statics without rejecting shared constants, readonly statics, or state
+       an owner exposes behind its own accessor. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AnalysisMode>Default</AnalysisMode>
+  </PropertyGroup>
+</Project>

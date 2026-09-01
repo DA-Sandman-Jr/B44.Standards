@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Negative probe: externally visible static fields that are neither const
+       nor readonly. AnalysisMode=Default on purpose — under the SDK default
+       CA2211 is off, so this probe only fails while B44.globalconfig pins it
+       explicitly. Built, not evaluated: CA2211 is a Roslyn analyzer. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AnalysisMode>Default</AnalysisMode>
+  </PropertyGroup>
+</Project>
