@@ -32,16 +32,19 @@ jobs:
         run: |
           set -euo pipefail
           # Accept .slnx as well as .sln: `dotnet new sln` emits the XML format
-          # on current SDKs, so a repository created from now on has one and a
-          # .sln-only search silently matches nothing.
+          # on current SDKs, so a .sln-only search never reaches a solution that
+          # is named .slnx. It does not pass over it quietly either — it dies in
+          # glob discovery, `ls` exiting 2 under `set -e`, saying only that a
+          # pattern did not match.
           # The `|| true` matters — under `set -e`, a non-matching glob makes
           # `ls` fail and kills the step before the emptiness check below can
           # run, which would make the error branch unreachable.
           SLN=$( { ls *.sln *.slnx 2>/dev/null || true; } | head -1 )
           if [ -z "$SLN" ]; then
-            # Fail rather than pass. A verification step that silently does
-            # nothing is worse than one that fails, because it reports green
-            # either way and nobody finds out until drift has already landed.
+            # A genuinely solution-less repository reaches an intentional
+            # error that names the fix, instead of an accidental `ls`/`set -e`
+            # failure reporting a glob that did not match. A verification step
+            # that cannot run has to say so in terms the reader can act on.
             echo "::error::No solution at the repository root, so the format gate cannot run." \
                  "Add one, or drop this workflow and call B44.Standards'" \
                  "reusable-dotnet-ci.yml, which takes allow-missing-solution for a deliberate gap."
