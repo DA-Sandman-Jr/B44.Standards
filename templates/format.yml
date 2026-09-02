@@ -3,6 +3,14 @@ name: format
 # Fails the build if any tracked C# file isn't dotnet-format clean. This is the
 # durable backstop behind the commit hooks: even if a hook is bypassed or
 # misconfigured, drift can never land on main.
+#
+# Format-only on purpose. A repository that also wants the engine-free Core
+# build and the test run should call B44.Standards' reusable-dotnet-ci.yml
+# instead of adding this file; this snippet exists for retrofitting a repository
+# that already has its own build and test workflow.
+#
+# The solution-discovery block below is deliberately identical in behaviour to
+# the one in reusable-dotnet-ci.yml. Keep them that way.
 
 on:
   push:
@@ -23,10 +31,24 @@ jobs:
       - name: Verify formatting
         run: |
           set -euo pipefail
-          SLN=$(ls *.sln | head -1)
+          # Accept .slnx as well as .sln: `dotnet new sln` emits the XML format
+          # on current SDKs, so a .sln-only search never reaches a solution that
+          # is named .slnx. It does not pass over it quietly either — it dies in
+          # glob discovery, `ls` exiting 2 under `set -e`, saying only that a
+          # pattern did not match.
+          # The `|| true` matters — under `set -e`, a non-matching glob makes
+          # `ls` fail and kills the step before the emptiness check below can
+          # run, which would make the error branch unreachable.
+          SLN=$( { ls *.sln *.slnx 2>/dev/null || true; } | head -1 )
           if [ -z "$SLN" ]; then
-            echo "No .sln at repo root — nothing to check."
-            exit 0
+            # A genuinely solution-less repository reaches an intentional
+            # error that names the fix, instead of an accidental `ls`/`set -e`
+            # failure reporting a glob that did not match. A verification step
+            # that cannot run has to say so in terms the reader can act on.
+            echo "::error::No solution at the repository root, so the format gate cannot run." \
+                 "Add one, or drop this workflow and call B44.Standards'" \
+                 "reusable-dotnet-ci.yml, which takes allow-missing-solution for a deliberate gap."
+            exit 1
           fi
           echo "Running dotnet format --verify-no-changes on $SLN"
           dotnet format "$SLN" --verify-no-changes

@@ -48,7 +48,7 @@ existing repo that predates it.
 | File | Goes to | Notes |
 |---|---|---|
 | `Directory.Build.props` | repo root | Select the `Game` guidance profile, repository-relative sync anchor, mandatory engine-free Core project, and compatibility-bounded B44.Standards version |
-| `format.yml` | `.github/workflows/` | dotnet-format gate |
+| `format.yml` | `.github/workflows/` | Format-only gate: `dotnet format --verify-no-changes` over the root solution, accepting `.sln` or `.slnx`. A repository with no root solution reaches an intentional error naming the fix, instead of failing opaquely in shell glob discovery. A repository that also wants the Core build and test run should call `reusable-dotnet-ci.yml` instead of adding this file |
 | `build-test.yml` | `.github/workflows/` | Build + test gate; replace `GAME` placeholders; B44 packages restore directly from nuget.org |
 | `nuget.config` | repo root | Optional deterministic nuget.org-only package source; no credentials |
 | `CLAUDE.skeleton.md` | new root `CLAUDE.md` | Repository-local starter only; B44.Standards inserts and maintains the canonical managed sections |
