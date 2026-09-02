@@ -39,6 +39,92 @@ jobs:
       - name: Pack
         run: dotnet pack B44.Standards.sln --configuration Release --no-build -p:Version=$VERSION --output ./nupkgs
 
+      # This repository builds against its own targets from the source tree, so
+      # nothing here ever consumes the packed layout. A config asset that stopped
+      # being packed would not fail any consumer either: their guards would simply
+      # stop firing and their builds would stay green. Consume the nupkg this run
+      # produced and prove one rule still bites.
+      - name: Smoke the packed policy
+        run: |
+          FEED="$(cd ./nupkgs && pwd)"
+          PROBE="$RUNNER_TEMP/b44-policy-probe"
+          rm -rf "$PROBE"; mkdir -p "$PROBE"
+
+          # Package source mapping is what makes this a proof rather than a
+          # formality: B44.Standards may ONLY come from the directory this run just
+          # packed, so an already-published version cannot satisfy it. The analyzers
+          # it depends on resolve from nuget.org as usual.
+          cat > "$PROBE/nuget.config" <<XML
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <config>
+              <add key="globalPackagesFolder" value="gpf" />
+            </config>
+            <packageSources>
+              <clear />
+              <add key="fresh" value="$FEED" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+            <packageSourceMapping>
+              <packageSource key="fresh">
+                <package pattern="B44.Standards" />
+              </packageSource>
+              <packageSource key="nuget.org">
+                <package pattern="*" />
+              </packageSource>
+            </packageSourceMapping>
+          </configuration>
+          XML
+
+          # B44EngineFreeCore is a policy whose operation depends on packed assets:
+          # it registers config/BannedSymbols.Determinism.txt as an AdditionalFile
+          # through a relative path that resolves only if the package carries its
+          # config/ folder.
+          cat > "$PROBE/Probe.csproj" <<XML
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net8.0</TargetFramework>
+              <B44EngineFreeCore>true</B44EngineFreeCore>
+            </PropertyGroup>
+            <ItemGroup>
+              <PackageReference Include="B44.Standards" Version="$VERSION" PrivateAssets="all" />
+            </ItemGroup>
+          </Project>
+          XML
+
+          # Clean first, so a failure below is the policy firing rather than a probe
+          # that never built.
+          echo 'internal static class PolicyProbe { internal const int Value = 1; }' > "$PROBE/Probe.cs"
+          if ! dotnet build "$PROBE/Probe.csproj" --nologo -v:minimal; then
+            echo "::error::The packed B44.Standards package does not produce a buildable consumer."
+            exit 1
+          fi
+
+          # One known prohibited call. RS0030 comes from the banned-symbol list the
+          # package carries.
+          cat > "$PROBE/Probe.cs" <<'CS'
+          internal static class PolicyProbe
+          {
+              internal static System.DateTime Now => System.DateTime.Now;
+          }
+          CS
+
+          set +e
+          OUT="$(dotnet build "$PROBE/Probe.csproj" --nologo -v:minimal 2>&1)"
+          RC=$?
+          set -e
+          echo "$OUT"
+
+          if [ "$RC" -eq 0 ]; then
+            echo "::error::A banned call compiled cleanly against the packed package. Policy is not arriving: the nupkg is missing a config or targets asset, and consumers would keep building green with enforcement silently gone."
+            exit 1
+          fi
+          if ! echo "$OUT" | grep -q 'RS0030'; then
+            echo "::error::The probe build failed, but not with RS0030. Policy did not fire; the failure is something else and the packaged enforcement is unproven."
+            exit 1
+          fi
+          echo "Packed policy enforced: RS0030 raised from the freshly packed package."
+
       - name: NuGet login
         uses: NuGet/login@v1
         id: login
