@@ -11,6 +11,18 @@ name: reusable-dotnet-ci
 #       with:
 #         core-project: MyGame.Core/MyGame.Core.csproj
 #         test-project: MyGame.Tests/MyGame.Tests.csproj
+#
+# A repository with more than one test project lists them all, one per line:
+#
+#         test-project: |
+#           MyGame.Tests/MyGame.Tests.csproj
+#           MyGame.Core.Tests/MyGame.Core.Tests.csproj
+#
+# Gate every suite the repository has. Before this input accepted a list, a
+# consumer with two test projects could only name one; the other built locally,
+# passed locally, sat in the solution, and was never executed by CI, so a
+# regression in it would have reached main green. Naming one of two is the
+# failure this list exists to prevent.
 
 on:
   workflow_call:
@@ -21,7 +33,9 @@ on:
         type: string
         default: ''
       test-project:
-        description: Path to the test csproj
+        description: >-
+          Path to the test csproj, or several separated by newlines. Every path
+          listed is built and run; a single path behaves exactly as before.
         required: true
         type: string
       dotnet-version:
@@ -77,8 +91,42 @@ jobs:
         if: inputs.core-project == ''
         run: dotnet build -c Debug -p:B44AgentSyncVerifyOnly=true
 
-      - name: Build test project
-        run: dotnet build ${{ inputs.test-project }} -c Debug -p:B44AgentSyncVerifyOnly=true
+      # Both steps below read the input through the environment rather than
+      # interpolating it into the script. `${{ }}` splices the caller's string
+      # into the shell source itself, so a path containing shell syntax would
+      # execute; an env var is data the shell never parses.
+      - name: Build test projects
+        env:
+          TEST_PROJECTS: ${{ inputs.test-project }}
+        run: |
+          set -euo pipefail
+          count=0
+          while IFS= read -r project; do
+            project="$(printf '%s' "$project" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+            [ -z "$project" ] && continue
+            count=$((count + 1))
+            echo "::group::Build $project"
+            dotnet build "$project" -c Debug -p:B44AgentSyncVerifyOnly=true
+            echo "::endgroup::"
+          done <<< "$TEST_PROJECTS"
+          # A list that parses to nothing would make both steps silent no-ops
+          # and report green, which is the same false pass allow-missing-solution
+          # exists to refuse. Fail instead.
+          if [ "$count" -eq 0 ]; then
+            echo "::error::test-project resolved to no project paths. Pass one path, or several separated by newlines."
+            exit 1
+          fi
+          echo "Built $count test project(s)."
 
       - name: Run tests
-        run: dotnet test ${{ inputs.test-project }} -c Debug --no-build
+        env:
+          TEST_PROJECTS: ${{ inputs.test-project }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r project; do
+            project="$(printf '%s' "$project" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+            [ -z "$project" ] && continue
+            echo "::group::Test $project"
+            dotnet test "$project" -c Debug --no-build
+            echo "::endgroup::"
+          done <<< "$TEST_PROJECTS"
