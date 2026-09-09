@@ -16,4 +16,7 @@ jobs:
     uses: DA-Sandman-Jr/B44.Standards/.github/workflows/reusable-dotnet-ci.yml@B44_CI_REF
     with:
       core-project: GameName.Core/GameName.Core.csproj
+      # One path, or several one per line. Gate every test project the
+      # repository has — one this workflow never runs still passes locally and
+      # still sits in the solution, so a regression in it reaches main green.
       test-project: GameName.Tests/GameName.Tests.csproj
