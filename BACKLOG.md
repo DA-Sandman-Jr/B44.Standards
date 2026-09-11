@@ -2,7 +2,8 @@
 
 Agreed work that has not yet shipped. This public backlog stays intentionally concise; detailed evaluation notes and private consumer sequencing are tracked separately until they become actionable work in this repository.
 
-Cross-repository programs remain single-sourced in [`B44.Common`'s backlog](https://github.com/DA-Sandman-Jr/B44.Common/blob/main/BACKLOG.md).
+Cross-repository plans live with the work in a location appropriate to its
+visibility; this backlog holds Standards' own tasks and links where needed.
 
 ## Planned work
 
