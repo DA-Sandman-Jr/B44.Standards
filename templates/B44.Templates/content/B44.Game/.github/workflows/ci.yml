@@ -4,11 +4,19 @@ name: ci
 # Runs on a runner WITHOUT the Godot executable — the mechanical proof that the
 # test suite stays engine-independent. Packages restore from nuget.org with no
 # credentials.
+#
+# Manual by design: hosted validation is a deliberate checkpoint, not the
+# development loop, so nothing here runs on push or pull request. Validate
+# locally while implementing and dispatch this after a meaningful feature, an
+# Epic or integration change, or before a release. A public repository, where
+# standard hosted runners are free, may add push and pull_request triggers.
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   ci:
