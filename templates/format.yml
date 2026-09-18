@@ -11,11 +11,12 @@ name: format
 #
 # The solution-discovery block below is deliberately identical in behaviour to
 # the one in reusable-dotnet-ci.yml. Keep them that way.
+#
+# Manual by design: hosted validation is a deliberate checkpoint, not the
+# development loop, so nothing here runs on push or pull request.
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   format:
