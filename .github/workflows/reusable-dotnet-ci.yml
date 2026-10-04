@@ -127,6 +127,10 @@ jobs:
             project="$(printf '%s' "$project" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
             [ -z "$project" ] && continue
             echo "::group::Test $project"
-            dotnet test "$project" -c Debug --no-build
+            if [ -f global.json ] && python3 -c 'import json, sys; sys.exit(0 if json.load(open("global.json")).get("test", {}).get("runner") == "Microsoft.Testing.Platform" else 1)'; then
+              dotnet test --project "$project" -c Debug --no-build
+            else
+              dotnet test "$project" -c Debug --no-build
+            fi
             echo "::endgroup::"
           done <<< "$TEST_PROJECTS"

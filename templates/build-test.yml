@@ -4,12 +4,13 @@ name: build-test
 # only checks formatting; this is the gate that catches build breaks and
 # failing tests before they land.
 #
+# Manual by design: hosted validation is a deliberate checkpoint, not the
+# development loop, so nothing here runs on push or pull request.
+#
 # TEMPLATE: replace GAME with the repo's Core/Tests project names.
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   build-test:
