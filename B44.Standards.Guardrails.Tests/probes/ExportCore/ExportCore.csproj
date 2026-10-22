@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The engine-free Core of a game, built only through ExportHost the way a
+       Godot export builds a real Core: under the host's configuration, which
+       Microsoft.NET.Sdk does not recognize when it is ExportRelease. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <B44EngineFreeCore>true</B44EngineFreeCore>
+  </PropertyGroup>
+</Project>

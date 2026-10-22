@@ -9,15 +9,17 @@ Shipped releases and closed evaluations are not open work. They are kept, conden
 
 ## Planned work
 
-### Release 0.16.0 — pin `CA2211`
+### Release 0.16.0 — pin `CA2211`, optimize `ExportRelease`
 
-**Status:** **Implemented, pending release** as of 2026-09-01. Merged to `main`; not tagged, not published, no consumer migrated. `0.15.1` remains the published boundary and every active consumer floats `0.15.*`; template defaults stay there until this ships.
+**Status:** **Implemented, pending release** as of 2026-09-01; the `ExportRelease` default joined it on 2026-10-22. Not tagged, not published, no consumer migrated. `0.15.2` remains the published boundary and every active consumer floats `0.15.*`; template defaults stay there until this ships.
 
 `CA2211` (non-constant fields should not be visible) is pinned explicitly in `B44.globalconfig` at `warning`. Like the culture family in 0.15.0, the rule is absent from the SDK's `Default` analysis mode — it ships enabled from `Minimum` upward only — so a consumer that set `AnalysisMode` for an unrelated reason lost it in silence, and `B44W004` would not object because it rejects only `None` and `AllDisabledByDefault`. Probes at `AnalysisMode=Default` assert both ends: visible non-constant statics are rejected, and constants, readonly statics, and state an owning type exposes behind its own accessor still compile. No new property, mechanism, or check.
 
 Measured before release, and a no-op for every consumer as they stand: no consumer sets `AnalysisMode`, so all twelve run `Recommended`, where the rule is already enabled and already an error; there are no `CA2211` suppressions in the portfolio, and a reflection-only scan of 21 first-party assemblies found no field it could fire on. A passing configuration can nevertheless now fail, which is why this is a minor rather than a patch.
 
 The same unreleased minor also carries the naming and structure guidance settled on 2026-09-01 — two `B44.Organization.md` bullets, two stale-prose corrections, and an `.editorconfig` seeded into `B44.Templates`. None of that widens enforcement for an existing consumer; it rides here because `CA2211` already forces the minor.
+
+**`ExportRelease` builds are optimized.** A Godot release export builds its host and every project the host references as `ExportRelease`. Godot.NET.Sdk sets `Optimize=true` for that configuration on its own host project only, and Microsoft.NET.Sdk enables `Optimize` only for a configuration named `Release`, so every engine-free Core shipped in an export with the JIT optimizer disabled. Measured on an active Godot consumer with `0.15.*`: both `dotnet build -c ExportRelease` and the export path, `dotnet publish -c ExportRelease -r win-x64`, emitted a Core whose `DebuggableAttribute` disables the JIT optimizer beside an optimized host, and a simulation-heavy level ran about 200 ms a frame unoptimized against about 4 ms optimized. `B44.Standards.props` now gives every project the Godot host's own line — `Optimize=true` for `ExportRelease` unless the project chose `Optimize` itself — so nothing changes for a configuration of any other name. A guardrail probe is built and run as `ExportRelease` and as `Debug`, and reads the attribute the compiler emitted into a `B44EngineFreeCore` library and into the host that references it: `ExportRelease` must optimize both and `Debug` neither. The same consumer, restored against a locally packed prerelease, exported an optimized Core while its Debug Core stayed unoptimized. Every Godot game and starter with a Core is affected; non-Godot consumers never build a configuration with that name. It is not a widening of enforcement, but it changes the code a consumer ships, so it waits for a deliberate float bump and a fresh export rather than entering `0.15.*` as a patch.
 
 ### Evaluate the remaining mechanical guardrails
 

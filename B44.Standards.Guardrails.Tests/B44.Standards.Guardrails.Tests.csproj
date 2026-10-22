@@ -320,6 +320,61 @@
            Text="The StaticOwnedState probe failed. The pin is rejecting shared constants, readonly statics, or static state an owning type exposes behind its own accessor." />
   </Target>
 
+  <!-- ── Release-export optimization ─────────────────────────────────────
+       A Godot export builds the host and every project it references as
+       ExportRelease. Godot.NET.Sdk optimizes its own host for that
+       configuration, but Microsoft.NET.Sdk optimizes only a configuration
+       named Release, so the engine-free Core shipped with the JIT optimizer
+       disabled: a green build, and a game many times slower than it should be.
+       A property evaluation would only prove what the props file says, so the
+       probe is built and run instead, and ExportHost reports the
+       DebuggableAttribute the compiler actually emitted into ExportCore and
+       into itself. Debug is the other half of the assertion: the default fills
+       the gap a Godot configuration name leaves and must not reach a debugging
+       build. -->
+  <Target Name="VerifyExportReleaseOptimizationProbes" BeforeTargets="Build">
+    <ItemGroup>
+      <_ExportConfiguration Include="ExportRelease;Debug" />
+    </ItemGroup>
+    <Exec Command="dotnet build &quot;$(MSBuildProjectDirectory)/probes/ExportHost/ExportHost.csproj&quot; -c %(_ExportConfiguration.Identity) -t:Rebuild -nologo -v:q -nodeReuse:false"
+          IgnoreExitCode="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low"
+          ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ExitCode" ItemName="_ExportBuildResult" />
+    </Exec>
+    <PropertyGroup>
+      <_ExportBuildResults>@(_ExportBuildResult, ',')</_ExportBuildResults>
+    </PropertyGroup>
+    <Error Condition="'$(_ExportBuildResults)' != '0,0'"
+           Text="The ExportHost probe did not build as @(_ExportConfiguration, ' and ') (exit codes '$(_ExportBuildResults)'), so the optimization of its assemblies cannot be read." />
+
+    <Exec Command="dotnet &quot;$(MSBuildProjectDirectory)/probes/ExportHost/bin/ExportRelease/net8.0/ExportHost.dll&quot;"
+          IgnoreExitCode="true"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low"
+          ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ConsoleOutput" ItemName="_ExportReleaseOutput" />
+    </Exec>
+    <Exec Command="dotnet &quot;$(MSBuildProjectDirectory)/probes/ExportHost/bin/Debug/net8.0/ExportHost.dll&quot;"
+          IgnoreExitCode="true"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low"
+          ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ConsoleOutput" ItemName="_DebugOutput" />
+    </Exec>
+    <PropertyGroup>
+      <_ExportReleaseReport>@(_ExportReleaseOutput, '|')</_ExportReleaseReport>
+      <_DebugReport>@(_DebugOutput, '|')</_DebugReport>
+    </PropertyGroup>
+    <Error Condition="'$(_ExportReleaseReport)' != 'ExportCore=optimized|ExportHost=optimized'"
+           Text="The ExportRelease probe reported '$(_ExportReleaseReport)', expected 'ExportCore=optimized|ExportHost=optimized'. Without the ExportRelease default in B44.Standards.props, Microsoft.NET.Sdk leaves Optimize off, and a Godot export ships its engine-free Core with the JIT optimizer disabled." />
+    <Error Condition="'$(_DebugReport)' != 'ExportCore=unoptimized|ExportHost=unoptimized'"
+           Text="The Debug probe reported '$(_DebugReport)', expected 'ExportCore=unoptimized|ExportHost=unoptimized'. The ExportRelease optimization default has reached a debugging configuration." />
+  </Target>
+
   <!-- ── Engine boundary ─────────────────────────────────────────────────── -->
   <Target Name="VerifyEngineBoundaryFixture" BeforeTargets="Build">
     <ItemGroup>
