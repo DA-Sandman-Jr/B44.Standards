@@ -11,6 +11,12 @@ assets:
   banned-API rules — severities in a packaged global analyzer config.
 - `CA1502` / `MA0051` complexity and method-length thresholds.
 - NuGet vulnerability audit on restore.
+- `Optimize=true` for the `ExportRelease` configuration, the line Godot.NET.Sdk
+  already gives its own host project. Microsoft.NET.Sdk optimizes only a
+  configuration named `Release`, so without it every other project in a Godot
+  release export — the engine-free Core included — ships with the JIT optimizer
+  disabled. A project that sets `Optimize` itself keeps its choice, and no
+  other configuration changes.
 - Opt-in synchronization of canonical organization/game guidance into marked
   root `CLAUDE.md` sections, plus recursive sibling `AGENTS.md` generation.
 

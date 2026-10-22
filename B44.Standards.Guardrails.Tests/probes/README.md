@@ -1,10 +1,15 @@
 # Guardrail probe projects
 
-Deliberately non-conforming project files. `B44.Standards.Guardrails.Tests`
-invokes one shipped verification target against each and asserts the outcome —
-the only way to exercise a check that is an MSBuild `<Target>` rather than a
-task, without a real violation in a real project.
+Small projects that `B44.Standards.Guardrails.Tests` drives out of process,
+asserting each outcome. Nothing here is in the solution.
 
-Nothing here is in the solution and nothing here is ever built or restored: the
-fixture runs a single named target, which needs evaluation only. Do not "fix"
-these files; each one is a negative test.
+Most are deliberately non-conforming project files for a check that is an
+MSBuild `<Target>` rather than a task. The fixture invokes that one shipped
+target, which needs evaluation only, so those probes are never restored or
+built — the only way to exercise such a check without a real violation in a
+real project. Do not "fix" them; each one is a negative test.
+
+The rest are compiled, because what they prove only exists in a real compile:
+the determinism ban, the culture and static-state severities, and the
+release-export optimization default. `ExportHost` is also run, to read the
+optimization its build actually emitted into `ExportCore` and into itself.

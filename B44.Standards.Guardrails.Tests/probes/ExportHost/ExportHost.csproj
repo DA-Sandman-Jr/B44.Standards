@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Stands in for the Godot host. It reports whether the JIT optimizer is
+       disabled in its own compiled assembly and in the Core it references, read
+       from the DebuggableAttribute the compiler actually emitted. Major roll
+       forward lets the net8.0 probe run on a machine with only a newer runtime. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../ExportCore/ExportCore.csproj" />
+  </ItemGroup>
+</Project>

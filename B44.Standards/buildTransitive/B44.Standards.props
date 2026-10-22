@@ -43,6 +43,18 @@
     <NuGetAuditLevel Condition="'$(NuGetAuditLevel)' == ''">moderate</NuGetAuditLevel>
   </PropertyGroup>
 
+  <!-- Godot's release export builds every project as ExportRelease.
+       Godot.NET.Sdk optimizes its own host project for that configuration,
+       but Microsoft.NET.Sdk enables Optimize only for a configuration named
+       Release, so every other project in the export — the engine-free Core
+       above all — shipped with the JIT optimizer disabled. Same line as the
+       Godot host's: an Optimize chosen in Directory.Build.props survives the
+       condition and one in the project body is evaluated after it, so either
+       wins. A no-op wherever no build is named ExportRelease. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'ExportRelease'">
+    <Optimize Condition="'$(Optimize)' == ''">true</Optimize>
+  </PropertyGroup>
+
   <ItemGroup>
     <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)../config/B44.globalconfig" />
     <!-- Test projects (by B44 convention, *.Tests) get a severity overlay. -->
