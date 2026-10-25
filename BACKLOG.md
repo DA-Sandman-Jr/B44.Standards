@@ -9,6 +9,25 @@ Shipped releases and closed evaluations are not open work. They are kept, conden
 
 ## Planned work
 
+### Ship Meziantou.Analyzer 3.0.316 as 0.17.0
+
+**Status:** **Planned** since 2026-10-24. `main` carries `Meziantou.Analyzer`
+3.0.316 (from 3.0.290). It must ship as a new minor, never as a 0.16.x patch.
+
+Measured 2026-10-24 against the ten `0.16.*` consumers by compiling each with
+3.0.316's analyzers swapped in. Eight show no new findings: the ArtillerySiege,
+DestructibleArtillery and Lix starters, B44.GameSystems.Steam, Sassy,
+EthicsAcademy, NowhereToNest and TimeMachineClicker. Two would fail to build on
+new `MA0001` findings, because the update flags more culture-sensitive string
+comparisons:
+
+- TicTacHoe: 10, all in `TicTacHoe.Core/Game/PlaceholderArt.cs`.
+- WhispersOfTheEarth: 2, in `WhispersOfTheEarth.Tests/DungeonControllerFloorTransitionTests.cs`.
+
+The release's new rule, `MA0243` (escape invisible characters), is off by
+default and stays off. Migrate the two consumers in their own crossing to
+`0.17.*`, as 0.16.0's `MA0001` call sites were.
+
 ### Evaluate the remaining mechanical guardrails
 
 **Status:** **Planned for evaluation** since 2026-08-13. The first implementation pass shipped in 0.12.0, the 2026-08-30 evaluations closed items 2, 3, and 4, three 2026-09-01 waves closed items 6, 7, and 9, then items 8, 13, and 14, then item 11, and item 12 closed on 2026-09-02; what follows is the remainder.
