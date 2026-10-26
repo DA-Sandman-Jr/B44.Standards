@@ -9,27 +9,6 @@ Shipped releases and closed evaluations are not open work. They are kept, conden
 
 ## Planned work
 
-### Ship Meziantou.Analyzer 3.0.316 as 0.17.0
-
-**Status:** **Implemented, pending release** as of 2026-10-25. `main` carries
-`Meziantou.Analyzer` 3.0.316 (from 3.0.290), and both packages read 0.17.0. Not
-tagged, not published, no consumer migrated; `0.16.0` remains the published
-boundary. It must ship as a new minor, never as a 0.16.x patch.
-
-Measured 2026-10-24 against the ten `0.16.*` consumers by compiling each with
-3.0.316's analyzers swapped in. Eight show no new findings: the ArtillerySiege,
-DestructibleArtillery and Lix starters, B44.GameSystems.Steam, Sassy,
-EthicsAcademy, NowhereToNest and TimeMachineClicker. Two would fail to build on
-new `MA0001` findings, because the update flags more culture-sensitive string
-comparisons:
-
-- TicTacHoe: 10, all in `TicTacHoe.Core/Game/PlaceholderArt.cs`.
-- WhispersOfTheEarth: 2, in `WhispersOfTheEarth.Tests/DungeonControllerFloorTransitionTests.cs`.
-
-The release's new rule, `MA0243` (escape invisible characters), is off by
-default and stays off. Migrate the two consumers in their own crossing to
-`0.17.*`, as 0.16.0's `MA0001` call sites were.
-
 ### Evaluate the remaining mechanical guardrails
 
 **Status:** **Planned for evaluation** since 2026-08-13. The first implementation pass shipped in 0.12.0, the 2026-08-30 evaluations closed items 2, 3, and 4, three 2026-09-01 waves closed items 6, 7, and 9, then items 8, 13, and 14, then item 11, and item 12 closed on 2026-09-02; what follows is the remainder.
@@ -59,7 +38,7 @@ No known defects are currently queued in this repository.
 
 Not open work. Kept so settled questions stay settled, and so the guardrail evidence referenced from `CLAUDE.md` remains findable. Full rationale and measurements are in each change's commit and release notes.
 
-### Shipped, 0.12.0 through 0.16.0
+### Shipped, 0.12.0 through 0.17.0
 
 - **0.12.0 / 0.12.1 — the first mechanical guardrail pass.** Engine boundary widened and generalized (`GodotPlugins`, Godot source generators, `Unity.*`, and any project opting into `B44EngineFree` rather than only a Core); banned-symbol guard integrity; test-infrastructure integrity; reference policy (no production reference to a test project, no unbounded `*` float on an internal `B44.*` package); opt-in repository hygiene, suppression budget, and warning policy; repository-owned `B44BannedSymbols` lists; orphaned `.uid`/`.import` sidecar detection; and `B44T003` for consumer runsettings that drop the zero-tests floor. Each guard ships with a build-only fixture asserting both detection and build failure. The hand-copied Godot guard target in the game template was retired in favour of the generalized check.
 - **0.13.0 — an anchorless repository-wide check now fails instead of passing green.** The ratchet, hygiene, and suppression budget each run once per build by comparing an anchor project against the project being built, so an empty anchor silently disabled them and produced a green build that had checked nothing. `B44H003`/`B44H004` and `B44R002`/`B44R003` now report from every project that sees the opt-in; `B44VerifyHygieneAnchor=false` and `B44VerifyRatchetAnchor=false` turn them off. An anchor naming a real project that is simply not in the build stays undecidable and is left alone.
@@ -68,12 +47,13 @@ Not open work. Kept so settled questions stay settled, and so the guardrail evid
 - **0.15.1 — extraction policy reconciled.** Shared guidance no longer makes a second consumer a precondition for extracting a bounded reusable capability; generalized infrastructure keeps the higher bar of multiple independent real consumers. Documentation only, no enforcement change, so it rode inside every consumer's existing `0.15.*` float.
 - **0.15.2 — backlog policy corrected.** Documentation only, inside `0.15.*`.
 - **0.16.0 — `CA2211` pinned, `ExportRelease` optimized.** `CA2211` (non-constant fields should not be visible) is pinned at `warning` for the same reason as the culture family: it is absent from the SDK's `Default` analysis mode, so a consumer that set `AnalysisMode` for an unrelated reason lost it in silence. `B44.Standards.props` gives every project the Godot host's own `Optimize=true` for `ExportRelease`, unless the project chose `Optimize` itself. Godot.NET.Sdk optimizes only its host in that configuration and Microsoft.NET.Sdk only a configuration named `Release`, so every engine-free Core had shipped in exports with the JIT optimizer disabled; a simulation-heavy level ran about 200 ms a frame unoptimized against about 4 ms optimized. A guardrail probe builds and runs a host over a `B44EngineFreeCore` library and asserts from the emitted `DebuggableAttribute` that `ExportRelease` optimizes both and `Debug` neither. The minor also carries `Meziantou.Analyzer` 3.0.290 (from 3.0.138) and the naming and structure guidance settled on 2026-09-01.
+- **0.17.0 — `Meziantou.Analyzer` 3.0.316.** The update from 3.0.290 reports more culture-sensitive string comparisons under `MA0001`, so a passing build can now fail, which is why it is a minor rather than a 0.16.x patch. Its new rule `MA0243` (escape invisible characters) is off by default and stays off. Nothing else changed.
 
-**Portfolio evidence.** Every check above was measured against every active consumer before adoption: bounded internal package floats everywhere; no production project referencing a test project; zero `RS0030` across all 26 boundary projects on the determinism additions; zero `CA1304`/`CA1305`/`CA1309`/`CA1310`/`CA1311` diagnostics and zero build failures on the pinned culture severities; and zero new diagnostics on the anchor guards across the three anchor shapes in use. 0.16.0 was measured from a packed candidate against the nine Godot game and starter units before it was tagged: zero `CA2211`, and the analyzer update's one new finding is `MA0001` on xUnit's culture-sensitive string assertions (`Assert.Contains`, `Assert.StartsWith` and `Assert.DoesNotContain` over two strings) — 45 call sites in three test suites, migrated in each consumer's own crossing with the analyzer's fix to `StringComparison.Ordinal`, and nothing else in any unit. Two consumers carried committed debris that the opt-in hygiene check reported when they enabled it, which is the check paying for itself rather than a migration cost. Two consumers did not yet run warnings-as-errors, which is why that check is opt-in rather than always on.
+**Portfolio evidence.** Every check above was measured against every active consumer before adoption: bounded internal package floats everywhere; no production project referencing a test project; zero `RS0030` across all 26 boundary projects on the determinism additions; zero `CA1304`/`CA1305`/`CA1309`/`CA1310`/`CA1311` diagnostics and zero build failures on the pinned culture severities; and zero new diagnostics on the anchor guards across the three anchor shapes in use. 0.16.0 was measured from a packed candidate against the nine Godot game and starter units before it was tagged: zero `CA2211`, and the analyzer update's one new finding is `MA0001` on xUnit's culture-sensitive string assertions (`Assert.Contains`, `Assert.StartsWith` and `Assert.DoesNotContain` over two strings) — 45 call sites in three test suites, migrated in each consumer's own crossing with the analyzer's fix to `StringComparison.Ordinal`, and nothing else in any unit. 0.17.0 was measured the same way against the ten `0.16.*` units, compiling each with 3.0.316's analyzers swapped in, and confirmed from a packed candidate in the two it affects: 14 new `MA0001` call sites, 12 in TicTacHoe's placeholder-art asset-name checks and 2 in a WhispersOfTheEarth test, and nothing else in any unit. Two consumers carried committed debris that the opt-in hygiene check reported when they enabled it, which is the check paying for itself rather than a migration cost. Two consumers did not yet run warnings-as-errors, which is why that check is opt-in rather than always on.
 
 ### Consumer rollout
 
-The 0.12.0 retrofit finished on 2026-08-26, with `Continuity` following on 2026-08-29 once the MA0002 decision below was made. The portfolio then crossed from `0.12.*` straight to `0.15.*` in one deliberate migration, taking the anchor guards, the determinism entries, and the pinned culture severities together rather than crossing three minors one at a time, with hygiene, suppression budgets, and the warning policy enabled and seeded per repository. On 2026-10-22 the Godot game repositories and starters crossed to `0.16.*` for the `ExportRelease` default; the remaining active consumers export nothing as `ExportRelease` and stay on `0.15.*` until they cross deliberately. `ThemedWeatherImages` remains on `0.6.*` and outside the active set.
+The 0.12.0 retrofit finished on 2026-08-26, with `Continuity` following on 2026-08-29 once the MA0002 decision below was made. The portfolio then crossed from `0.12.*` straight to `0.15.*` in one deliberate migration, taking the anchor guards, the determinism entries, and the pinned culture severities together rather than crossing three minors one at a time, with hygiene, suppression budgets, and the warning policy enabled and seeded per repository. On 2026-10-22 the Godot game repositories and starters crossed to `0.16.*` for the `ExportRelease` default; the remaining active consumers export nothing as `ExportRelease` and stay on `0.15.*` until they cross deliberately. On 2026-10-25 the nine active `0.16.*` units crossed to `0.17.*` — the ArtillerySiege, DestructibleArtillery and Lix starters, Sassy, EthicsAcademy, NowhereToNest, TicTacHoe, TimeMachineClicker and WhispersOfTheEarth — with lock files moving only `B44.Standards` and `Meziantou.Analyzer`. `B44.GameSystems.Steam` was archived the same day and stays on `0.16.*`. `ThemedWeatherImages` remains on `0.6.*` and outside the active set.
 
 ### Naming and structure conventions — settled 2026-09-01
 
