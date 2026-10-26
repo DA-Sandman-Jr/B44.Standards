@@ -11,8 +11,10 @@ Shipped releases and closed evaluations are not open work. They are kept, conden
 
 ### Ship Meziantou.Analyzer 3.0.316 as 0.17.0
 
-**Status:** **Planned** since 2026-10-24. `main` carries `Meziantou.Analyzer`
-3.0.316 (from 3.0.290). It must ship as a new minor, never as a 0.16.x patch.
+**Status:** **Implemented, pending release** as of 2026-10-25. `main` carries
+`Meziantou.Analyzer` 3.0.316 (from 3.0.290), and both packages read 0.17.0. Not
+tagged, not published, no consumer migrated; `0.16.0` remains the published
+boundary. It must ship as a new minor, never as a 0.16.x patch.
 
 Measured 2026-10-24 against the ten `0.16.*` consumers by compiling each with
 3.0.316's analyzers swapped in. Eight show no new findings: the ArtillerySiege,
