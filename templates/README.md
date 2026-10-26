@@ -25,7 +25,7 @@ Parameters (`dotnet new b44game --help` lists them):
 
 | Parameter | Default | Purpose |
 |---|---|---|
-| `--standardsVersion` | `0.16.*` | Compatibility-bounded float for `B44.Standards` |
+| `--standardsVersion` | `0.17.*` | Compatibility-bounded float for `B44.Standards` |
 | `--commonVersion` | `0.11.*` | Compatibility-bounded float for `B44.Common` |
 | `--targetFramework` | `net8.0` | Core and test target framework |
 | `--ciRef` | `9c6faefab05253a4fa1d16b971d37cc8c80bf750` | Reviewed commit for the shared reusable CI workflow |
